@@ -1,0 +1,64 @@
+# 项目根目录 .gitignore
+# 忽略所有系统临时文件
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# 忽略 IDE 配置
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Python/Flask 忽略项
+/backend/venv/
+/backend/__pycache__/
+/backend/*.pyc
+/backend/.env
+/backend/*.log
+/backend/instance/
+/backend/.coverage
+/backend/htmlcov/
+/backend/*.sqlite3
+
+# Node.js/Vue 忽略项
+/frontend/node_modules/
+/frontend/dist/
+/frontend/.cache/
+/frontend/package-lock.json  # 如果使用 npm，可保留 package.json 并忽略 lock 文件
+/frontend/yarn.lock
+/frontend/npm-debug.log
+/frontend/.env.local
+/frontend/.env.*.local
+
+# 数据目录（避免提交敏感数据）
+/data/
+*.csv
+*.db
+*.sql
+
+# 日志和调试文件
+*.log
+*.trace
+*.pid
+
+# 编译/构建输出
+/dist/
+/build/
+/out/
+*.min.js
+*.min.css
+
+# 环境变量文件（敏感信息）
+.env
+.env.local
+.env.development
+.env.production
+
+# Conda 相关
+.conda/
+.conda-lock/
+conda-meta/
