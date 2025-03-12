@@ -2,9 +2,9 @@
   <div class="auth-container">
     <el-card class="auth-card">
       <h2>用户登录</h2>
-      <el-form :model="form" ref="loginForm" label-width="80px">
-        <el-form-item label="用户名" prop="username">
-          <el-input v-model="form.username" placeholder="请输入用户名"></el-input>
+      <el-form :model="form" ref="loginForm" label-width="80px" @keyup.enter.native="handleLogin">
+        <el-form-item label="账号" prop="id">
+          <el-input v-model="form.id" placeholder="请输入账号ID"></el-input>
         </el-form-item>
         <el-form-item label="密码" prop="password">
           <el-input type="password" v-model="form.password" placeholder="请输入密码"></el-input>
@@ -27,17 +27,20 @@ import { useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
 
 const router = useRouter();
-const form = ref({ username: '', password: '' });
+const form = ref({ id: '', password: '' });
 const loading = ref(false);
 
 const handleLogin = async () => {
   try {
     loading.value = true;
-    const res = await api.loginUser(form.value);
+    const res = await api.loginUser({
+      id: form.value.id,
+      password: form.value.password
+    });
     if (res.status === 200) {
       ElMessage.success('登录成功');
       localStorage.setItem('access_token', res.data.token); // 如果有 token
-      router.push('/dashboard');
+      router.push({ name: 'Dashboard' });
     }
   } catch (error) {
     if (error.response) {

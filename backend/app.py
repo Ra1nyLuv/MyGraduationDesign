@@ -21,105 +21,121 @@ db = SQLAlchemy(app)
 bcrypt = Bcrypt(app)
 migrate = Migrate(app, db)
 
-class VisitLog(db.Model):
-    __tablename__ = 'visit_logs'
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
-    visit_time = db.Column(db.DateTime, default=db.func.current_timestamp())
-
-class Student(db.Model):
-    __tablename__ = 'students'
-    id = db.Column(db.Integer, primary_key=True)
-    student_id = db.Column(db.String(20), unique=True, comment='学号')
-    name = db.Column(db.String(50), comment='姓名')
-    course = db.Column(db.String(100), comment='课程名称')
-    score = db.Column(db.Float, comment='考试成绩')
-    submit_time = db.Column(db.DateTime, default=db.func.current_timestamp(), comment='提交时间')
-
 class User(db.Model):
-    __tablename__ = 'users'
-    id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(80), unique=True, nullable=False)
+    __tablename__ = 'users' # 存储用户数据
+    id = db.Column(db.String(80), primary_key=True)
+    name = db.Column(db.String(80), nullable=False)
     password = db.Column(db.String(255), nullable=False)
+    phone_number = db.Column(db.String(11), unique=True, nullable=False)
+
+class SynthesisGrade(db.Model):
+    __tablename__ = 'synthesis_grades'
+    id = db.Column(db.String(80), db.ForeignKey('users.id'), primary_key=True)
+    name = db.Column(db.String(80), nullable=False)
+    course_points = db.Column(db.Float, nullable=True)
+    comprehensive_score = db.Column(db.Float, nullable=False)
+    user = db.relationship('User', backref='synthesis_grades')
+
+class StudyProgress(db.Model):
+    __tablename__ = 'study_progress' # 学生学习进度详情
+    id = db.Column(db.String(80), db.ForeignKey('users.id'), primary_key=True)
+    name = db.Column(db.String(80), nullable=False)
+    task_completed = db.Column(db.Integer, nullable=False)  # 任务完成数
+    completion_percent = db.Column(db.Float, nullable=False)  # 任务点完成百分比
+    video_duration = db.Column(db.Integer)  # 视频观看时长(分钟)
+    discussions = db.Column(db.Integer)  # 讨论数
+    study_count = db.Column(db.Integer)  # 章节学习次数
+    study_status = db.Column(db.String(255))  # 学习情况
+    user = db.relationship('User', backref='study_progress')
+
+# class ChapterStudyTime(db.Model): xlsx文件中的信息不明确, 故暂时搁置
+#     __tablename__ = 'chapter_study_time' # 章节学习次数
+
+
+# class MissionCompletion(db.Model): 暂时搁置
+#     __tablename__ = 'mission_completion' # 任务点完成情况
+
+
+# class VideoWatchTime(db.Model): 暂时搁置
+#     __tablename__ = 'video_watch_time' # 音视频观看详情
+
+
+class DiscussionParticipation(db.Model):
+    __tablename__ = 'discussion_participation' # 章节学习次数
+    id = db.Column(db.String(80), db.ForeignKey('users.id'), primary_key=True)
+    name = db.Column(db.String(80), nullable=False)
+    total_discussions = db.Column(db.Integer, nullable=False)  # 总讨论数
+    posted_discussions = db.Column(db.Integer)  # 发表讨论
+    replied_discussions = db.Column(db.Integer)  # 回复讨论
+    replied_topics = db.Column(db.Integer)  # 回复话题个数
+    upvotes_received = db.Column(db.Integer)  # 获赞数
+    user = db.relationship('User', backref='discussion_participation')
+
+# class HomeworkCount(db.Model): 暂时搁置, 字段信息暂无法读取
+#     __tablename__ = 'homework_count' # 作业统计
+
+
+# class ExamResult(db.Model): 暂时搁置, 字段信息暂无法读取
+#     __tablename__ = 'exam_results' # 考试统计
+
+
+# class ChapterExamResult(db.Model): 表格信息缺失, 暂时搁置
+#     __tablename__ = 'chapter_exam_results' # 章节测验统计
+
+
+class OfflineGrade(db.Model):
+    __tablename__ = 'offline_grades' # 线下成绩
+    id = db.Column(db.String(80), db.ForeignKey('users.id'), primary_key=True)
+    name = db.Column(db.String(80), nullable=False)
+    comprehensive_score = db.Column(db.Float, nullable=False)
+    user = db.relationship('User', backref='offline_grades')
+
 
 @app.route('/api/register', methods=['POST'])
 def register():
     try:
         data = request.get_json()
+        # 验证必填字段
+        if not all(key in data for key in ['id', 'password', 'name', 'phone_number']):
+            return jsonify({"error": "缺少必要字段: id/password/name/phone_number"}), 400
+
+        # 检查手机号唯一性
+        if User.query.filter_by(phone_number=data['phone_number']).first():
+            return jsonify({"error": "该手机号已被注册"}), 400
+        if User.query.filter_by(id=data['id']).first():
+            return jsonify({"error": "用户ID已被占用"}), 400
+
         hashed_password = bcrypt.generate_password_hash(data['password']).decode('utf-8')
-        new_user = User(username=data['username'], password=hashed_password)
+        new_user = User(
+            id=data['id'],
+            password=hashed_password,
+            name=data['name'],
+            phone_number=data['phone_number']
+        )
         db.session.add(new_user)
         db.session.commit()
-        return jsonify({"message": "注册成功"}), 201
+        return jsonify({"message": "用户注册成功", "user_id": new_user.id}), 201
     except Exception as e:
         db.session.rollback()
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": f"注册失败: {str(e)}"}), 500
 
 @app.route('/api/login', methods=['POST'])
 def login():
     try:
         data = request.get_json()
-        user = User.query.filter_by(username=data['username']).first()
+        user = User.query.filter_by(id=data['id']).first()
         
         if not user or not bcrypt.check_password_hash(user.password, data['password']):
-            return jsonify({"error": "用户名或密码错误"}), 401
+            return jsonify({"error": "账号或密码错误"}), 401
 
-                # 暂时移除登录日志记录
-        # new_log = VisitLog(user_id=user.id)
-        # db.session.add(new_log)
-        # db.session.commit()
 
         return jsonify({
             "message": "登录成功",
-            "username": user.username,
+            "id": user.id,
             "token": jwt.encode({'user_id': user.id, 'exp': datetime.utcnow() + timedelta(hours=1)}, os.getenv('SECRET_KEY'), algorithm='HS256')
         }), 200
     except Exception as e:
         return jsonify({"error": "登录失败"}), 500
-
-@app.route('/api/data', methods=['GET'])
-def get_chart_data():
-    from sqlalchemy import func, extract
-    # 获取最近6个月数据
-    monthly_data = db.session.query(
-        func.date_format(VisitLog.visit_time, '%Y-%m').label('month'),
-        func.count(VisitLog.id)
-    ).group_by('month').order_by(func.year(VisitLog.visit_time), func.month(VisitLog.visit_time)).limit(6).all()
-
-    return jsonify({
-        "stats": {
-            "totalUsers": User.query.count(),
-            "todayVisits": VisitLog.query.filter(func.date(VisitLog.visit_time) == func.curdate()).count()
-        },
-        "chartData": {
-            "months": [item[0] for item in monthly_data],
-            "values": [item[1] for item in monthly_data]
-        }
-    })
-@app.route('/api/import', methods=['POST'])
-def import_data():
-    try:
-        if 'file' not in request.files:
-            return jsonify({'error': '未选择文件'}), 400
-        
-        file = request.files['file']
-        if file.filename == '':
-            return jsonify({'error': '空文件名'}), 400
-        
-        df = pd.read_excel(file)
-        for _, row in df.iterrows():
-            student = Student(
-                student_id=row['学号'],
-                name=row['姓名'],
-                course=row['课程名称'],
-                score=row['考试成绩']
-            )
-            db.session.add(student)
-        db.session.commit()
-        return jsonify({'message': f'成功导入{len(df)}条数据'}), 200
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'error': str(e)}), 500
 
 # 确保在应用上下文中创建数据库表
 with app.app_context():
