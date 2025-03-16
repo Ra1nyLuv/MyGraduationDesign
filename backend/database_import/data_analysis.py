@@ -1,7 +1,7 @@
 import pandas as pd
 
 try:
-    excel_path = 'data/datafile.xlsx'
+    excel_path = 'data/BigData233-234(Python).xlsx'
     xls = pd.ExcelFile(excel_path)
     
     print('Excel工作簿结构:')

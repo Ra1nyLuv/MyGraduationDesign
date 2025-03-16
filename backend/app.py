@@ -26,27 +26,26 @@ class User(db.Model):
     id = db.Column(db.String(80), primary_key=True)
     name = db.Column(db.String(80), nullable=False)
     password = db.Column(db.String(255), nullable=False)
-    phone_number = db.Column(db.String(11), unique=True, nullable=False)
+    phone_number = db.Column(db.String(11), nullable=False)
 
 class SynthesisGrade(db.Model):
-    __tablename__ = 'synthesis_grades'
+    __tablename__ = 'synthesis_grades' # 综合成绩
     id = db.Column(db.String(80), db.ForeignKey('users.id'), primary_key=True)
     name = db.Column(db.String(80), nullable=False)
-    course_points = db.Column(db.Float, nullable=True)
+    course_points = db.Column(db.Float, nullable=True) 
     comprehensive_score = db.Column(db.Float, nullable=False)
     user = db.relationship('User', backref='synthesis_grades')
 
-class StudyProgress(db.Model):
-    __tablename__ = 'study_progress' # 学生学习进度详情
-    id = db.Column(db.String(80), db.ForeignKey('users.id'), primary_key=True)
-    name = db.Column(db.String(80), nullable=False)
-    task_completed = db.Column(db.Integer, nullable=False)  # 任务完成数
-    completion_percent = db.Column(db.Float, nullable=False)  # 任务点完成百分比
-    video_duration = db.Column(db.Integer)  # 视频观看时长(分钟)
-    discussions = db.Column(db.Integer)  # 讨论数
-    study_count = db.Column(db.Integer)  # 章节学习次数
-    study_status = db.Column(db.String(255))  # 学习情况
-    user = db.relationship('User', backref='study_progress')
+# class StudyProgress(db.Model): # 数据文件中无姓名和id信息, 暂时搁置
+#     __tablename__ = 'study_progress' # 学生学习进度详情
+#     name = db.Column(db.String(80), nullable=False)
+#     task_completed = db.Column(db.Integer, nullable=False)  # 任务完成数
+#     completion_percent = db.Column(db.Float, nullable=False)  # 任务点完成百分比
+#     video_duration = db.Column(db.Integer)  # 视频观看时长(分钟)
+#     discussions = db.Column(db.Integer)  # 讨论数
+#     study_count = db.Column(db.Integer)  # 章节学习次数
+#     study_status = db.Column(db.String(255))  # 学习情况
+#     user = db.relationship('User', backref='study_progress')
 
 # class ChapterStudyTime(db.Model): xlsx文件中的信息不明确, 故暂时搁置
 #     __tablename__ = 'chapter_study_time' # 章节学习次数
@@ -99,9 +98,7 @@ def register():
         if not all(key in data for key in ['id', 'password', 'name', 'phone_number']):
             return jsonify({"error": "缺少必要字段: id/password/name/phone_number"}), 400
 
-        # 检查手机号唯一性
-        if User.query.filter_by(phone_number=data['phone_number']).first():
-            return jsonify({"error": "该手机号已被注册"}), 400
+
         if User.query.filter_by(id=data['id']).first():
             return jsonify({"error": "用户ID已被占用"}), 400
 
