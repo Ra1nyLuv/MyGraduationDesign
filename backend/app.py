@@ -55,9 +55,25 @@ class SynthesisGrade(db.Model):
 #     __tablename__ = 'mission_completion' # 任务点完成情况
 
 
-# class VideoWatchTime(db.Model): 暂时搁置
-#     __tablename__ = 'video_watch_time' # 音视频观看详情
-
+class VideoWatchingDetail(db.Model):
+    __tablename__ = 'video_watching_details'
+    id = db.Column(db.String(80), db.ForeignKey('users.id'), primary_key=True)
+    name = db.Column(db.String(80), nullable=False)
+    rumination_ratio1 = db.Column(db.Float)
+    watch_duration1 = db.Column(db.Float)  
+    rumination_ratio2 = db.Column(db.Float)
+    watch_duration2 = db.Column(db.Float)
+    rumination_ratio3 = db.Column(db.Float)
+    watch_duration3 = db.Column(db.Float)
+    rumination_ratio4 = db.Column(db.Float)
+    watch_duration4 = db.Column(db.Float)
+    rumination_ratio5 = db.Column(db.Float)
+    watch_duration5 = db.Column(db.Float)
+    rumination_ratio6 = db.Column(db.Float)
+    watch_duration6 = db.Column(db.Float)
+    rumination_ratio7 = db.Column(db.Float)
+    watch_duration7 = db.Column(db.Float)
+    user = db.relationship('User', backref='video_watching_details')
 
 
 class DiscussionParticipation(db.Model):
@@ -72,10 +88,13 @@ class DiscussionParticipation(db.Model):
     user = db.relationship('User', backref='discussion_participation')
 
 
+class ExamStatistic(db.Model):
+    __tablename__ = 'exam_statistic' # 考试统计
+    id = db.Column(db.String(80), db.ForeignKey('users.id'), primary_key=True) # 学号/工号
+    name = db.Column(db.String(80), nullable=False) # 姓名
+    score = db.Column(db.Float, nullable=True) # 成绩
+    user = db.relationship('User', backref='exam_statistic')
 
-
-# class ExamResult(db.Model): 暂时搁置, 字段信息暂无法读取
-#     __tablename__ = 'exam_results' # 考试统计
 
 
 # class ChapterExamResult(db.Model): 表格信息缺失, 暂时搁置
