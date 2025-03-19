@@ -59,6 +59,7 @@ class SynthesisGrade(db.Model):
 #     __tablename__ = 'video_watch_time' # 音视频观看详情
 
 
+
 class DiscussionParticipation(db.Model):
     __tablename__ = 'discussion_participation' # 章节学习次数
     id = db.Column(db.String(80), db.ForeignKey('users.id'), primary_key=True)
@@ -70,8 +71,7 @@ class DiscussionParticipation(db.Model):
     upvotes_received = db.Column(db.Integer)  # 获赞数
     user = db.relationship('User', backref='discussion_participation')
 
-# class HomeworkCount(db.Model): 暂时搁置, 字段信息暂无法读取
-#     __tablename__ = 'homework_count' # 作业统计
+
 
 
 # class ExamResult(db.Model): 暂时搁置, 字段信息暂无法读取
@@ -88,6 +88,21 @@ class OfflineGrade(db.Model):
     name = db.Column(db.String(80), nullable=False)
     comprehensive_score = db.Column(db.Float, nullable=False)
     user = db.relationship('User', backref='offline_grades')
+
+
+class HomeworkStatistic(db.Model):
+    __tablename__ = 'homework_statistic'
+    id = db.Column(db.String(80), db.ForeignKey('users.id'), primary_key=True)
+    name = db.Column(db.String(80), nullable=False)
+    score2 = db.Column(db.Float)
+    score3 = db.Column(db.Float)
+    score4 = db.Column(db.Float)
+    score5 = db.Column(db.Float)
+    score6 = db.Column(db.Float)
+    score7 = db.Column(db.Float)
+    score8 = db.Column(db.Float)
+    score9 = db.Column(db.Float)
+    user = db.relationship('User', backref='homework_statistic')
 
 
 @app.route('/api/register', methods=['POST'])
@@ -134,7 +149,7 @@ def login():
     except Exception as e:
         return jsonify({"error": "登录失败"}), 500
 
-# 确保在应用上下文中创建数据库表
+
 with app.app_context():
     db.create_all()
 
