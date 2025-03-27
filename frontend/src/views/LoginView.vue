@@ -18,6 +18,12 @@
       </p>
     </el-card>
   </div>
+  <footer id="footer">
+    <div class="container">
+      <div class="copyright">Copyright &copy; 2025. <br>莆田学院 新工科产业学院 数据225 <br> 陈俊霖 <br> All rights reserved.</div>
+      <div class="credits"></div>
+    </div>
+  </footer>
 </template>
 
 <script setup>
@@ -87,5 +93,15 @@ const goToRegister = () => {
   margin-top: 1.5rem;
   font-size: 0.875rem;
   color: #606266;
+}
+
+#footer {
+  padding: 0 0 30px 0;
+  color: #677184;
+  font-size: 14px;
+  text-align: center;
+  background: #f5f7fa;
+  bottom: 0ch;
+  opacity: 0.8;
 }
 </style>

@@ -46,8 +46,7 @@ export default {
     });
   },
   getChartData() {
-    return apiClient.get('/api/data', {
-  
-    });
-  },
+    return apiClient.get('/api/chart-data');
+  }
+  // 待添加其他接口...
 };

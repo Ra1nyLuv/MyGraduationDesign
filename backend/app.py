@@ -171,31 +171,34 @@ class HomeworkStatistic(db.Model):
 def login():
     if request.method == 'OPTIONS':
         return _build_cors_preflight_response()
+    
     try:
         data = request.get_json()
         user = User.query.filter_by(id=data['id']).first()
         
+        app.logger.debug(f"尝试登录用户: {data.get('id')}")
+        
         if not user or not bcrypt.check_password_hash(user.password, data['password']):
-            return jsonify({"error": "账号或密码错误"}), 401, {'Access-Control-Allow-Origin': 'http://localhost:5173'}
-
-
+            app.logger.warning(f"登录失败 - 用户ID: {data.get('id')}, 错误类型: 账号或密码错误")
+            return jsonify({"error": "账号或密码错误"}), 401
+        
+        access_token = create_access_token(identity=user.id)
+        app.logger.info(f"用户登录成功: {user.id}, Token已生成")
+        
         return jsonify({
             "message": "登录成功",
             "id": user.id,
-            "token": jwt.encode({'user_id': user.id, 'exp': datetime.utcnow() + timedelta(hours=1)}, os.getenv('JWT_SECRET_KEY'), algorithm='HS256')
-        }), 200, {'Access-Control-Allow-Origin': 'http://localhost:5173'}
-        app.logger.info(f'登录请求数据: {data}')
-        app.logger.info(f'当前环境变量状态: MYSQL_HOST={os.getenv("MYSQL_HOST")}, MYSQL_DB={os.getenv("MYSQL_DB")}')
-    except Exception as e:
-        app.logger.error(f'登录失败异常详情: {str(e)}', exc_info=True)
-        app.logger.error(f'数据库查询语句: {str(db.session.query(User).filter_by(id=data["id"]))}')
-        return jsonify({"error": "登录失败"}), 500, {'Access-Control-Allow-Origin': 'http://localhost:5173'}
+            "token": access_token
+        }), 200
 
+    except Exception as e:
+        app.logger.error(f"登录异常: {str(e)}", exc_info=True)
+        return jsonify({"error": "登录失败"}), 500
 @app.route('/api/register', methods=['POST'])
 def register():
     try:
         data = request.get_json()
-        # 验证必填字段
+        
         if not all(key in data for key in ['id', 'password', 'name', 'phone_number']):
             return jsonify({"error": "缺少必要字段: id/password/name/phone_number"}), 400
 
@@ -218,38 +221,32 @@ def register():
         return jsonify({"error": f"注册失败: {str(e)}"}), 500
 
 
-@app.route('/my-data', methods=['GET', 'OPTIONS'])
-
-
+@app.route('/api/my-data', methods=['GET', 'OPTIONS'])
 @jwt_required()
 def get_user_data():
     if request.method == 'OPTIONS':
         return _build_cors_preflight_response()
-    current_user = get_jwt_identity()
+    
     try:
-        user = User.query.get(int(current_user))
+        current_user_id = get_jwt_identity()  
+        
+        user = User.query.options(
+            db.joinedload(User.synthesis_grades),
+            db.joinedload(User.homework_statistic),
+            db.joinedload(User.exam_statistic),
+            db.joinedload(User.discussion_participation),
+            db.joinedload(User.video_watching_details),
+            db.joinedload(User.offline_grades)
+        ).get(current_user_id)
+        
         if not user:
+            app.logger.warning(f"用户数据查询失败 - 无效用户ID: {current_user_id}")
             return jsonify({'error': '用户不存在'}), 404
-        
-        synthesis = SynthesisGrade.query.filter_by(id=user.id).first()
-        homework = HomeworkStatistic.query.filter_by(id=user.id).first() or HomeworkStatistic()
-        
-        # 处理空值情况
-        homework_scores = [
-            homework.score2 or 0,
-            homework.score3 or 0, 
-            homework.score4 or 0,
-            homework.score5 or 0,
-            homework.score6 or 0,
-            homework.score7 or 0,
-            getattr(homework, 'score8', 0) or 0,
-            getattr(homework, 'score9', 0) or 0
-        ]
 
-        # 添加密钥检查
-        if not os.getenv('JWT_SECRET_KEY'):
-            app.logger.error('JWT_SECRET_KEY未配置')
-            return jsonify({'error': '服务器配置错误'}), 500
+        homework = user.homework_statistic[0] if user.homework_statistic else HomeworkStatistic()
+        exam = user.exam_statistic[0] if user.exam_statistic else ExamStatistic(score=0)
+        synthesis = user.synthesis_grades[0] if user.synthesis_grades else SynthesisGrade(comprehensive_score=0)
+        
         exam = ExamStatistic.query.filter_by(id=user.id).first() or ExamStatistic(score=0)
         synthesis = SynthesisGrade.query.filter_by(id=user.id).first() or SynthesisGrade(comprehensive_score=0)
         discussion = DiscussionParticipation.query.filter_by(id=user.id).first()
@@ -307,25 +304,6 @@ def get_user_data():
         app.logger.error(f'数据查询失败: {str(e)}')
         return jsonify({'error': '获取数据失败', 'detail': str(e)}), 500
 
-@app.route('/data', methods=['GET'])
-@jwt_required()
-def get_chart_data():
-    current_user = get_jwt_identity()
-    user_data = HomeworkStatistic.query.get(current_user)
-    if not user_data:
-        return jsonify({'error': '未找到作业数据'}), 404
-    
-    exam_data = ExamStatistic.query.get(current_user)
-    
-    return jsonify({
-        'chartData': {
-            'labels': ['作业2', '作业3', '作业4', '作业5', '作业6', '作业7'],
-            'datasets': [{
-                'label': '作业成绩',
-                'data': homework_scores,
-                'backgroundColor': 'rgba(54, 162, 235, 0.5)'
-            }]
-        }}), 200
 
 
 with app.app_context():
@@ -339,9 +317,17 @@ def _build_cors_preflight_response():
     response = jsonify({'msg': 'Preflight Request'})
     response.headers.add('Access-Control-Allow-Origin', 'http://localhost:5173')
     response.headers.add('Access-Control-Allow-Headers', 'Content-Type, Authorization')
-    response.headers.add('Access-Control-Allow-Methods', 'POST, OPTIONS')
+    response.headers.add('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
     response.headers.add('Access-Control-Allow-Credentials', 'true')
     return response
+
+@app.route('/api/chart-data', methods=['GET', 'OPTIONS'])
+def get_chart_data():
+    if request.method == 'OPTIONS':
+        return _build_cors_preflight_response()
+    
+    # 这里添加获取图表数据的逻辑
+    return jsonify({"status": 0, "msg": "获取图表数据成功", "data": []})
 
 
 if __name__ == '__main__':
