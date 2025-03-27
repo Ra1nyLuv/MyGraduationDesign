@@ -1,7 +1,9 @@
 import axios from 'axios';
 
+
+
 const apiClient = axios.create({
-  baseURL: '/api',
+  baseURL: 'http://localhost:5000',
   timeout: 5000,
 });
 
@@ -38,7 +40,14 @@ export default {
     return apiClient.post('/api/login', data);
   },
   // 数据接口
+  getUserData() {
+    return apiClient.get('/api/my-data', {
+  
+    });
+  },
   getChartData() {
-    return apiClient.get('/data');
+    return apiClient.get('/api/data', {
+  
+    });
   },
 };

@@ -1,0 +1,33 @@
+/* 全局样式兼容性修复 */
+@charset "UTF-8";
+
+/* 标准化属性声明 */
+html {
+  lang: "zh-CN";
+}
+
+/* 修正Element Plus组件样式 */
+.el-pagination .el-input__inner {
+  -webkit-appearance: textfield;
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+/* 滚动条样式兼容处理 */
+.el-table__body-wrapper::-webkit-scrollbar {
+  width: 6px;
+  background-color: #f5f5f5;
+}
+
+/* 标准化mask属性声明顺序 */
+.custom-mask {
+  -webkit-mask-size: cover;
+  mask-size: cover;
+  -webkit-mask: url(mask.png);
+  mask: url(mask.png);
+}
+
+/* 移除不兼容的scrollbar-width */
+.scroll-container {
+  scrollbar-color: #909399 transparent;
+}
