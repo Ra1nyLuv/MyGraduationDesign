@@ -28,7 +28,7 @@ const props = defineProps({
   },
   width: {
     type: String,
-    default: '100%'
+    default: '100%' 
   }
 });
 
@@ -37,24 +37,65 @@ let chartInstance = null;
 let observer = null;
 
 const initChart = () => {
-  if (!chartEl.value) return;
+  if (!chartEl.value) {
+    console.warn('[BaseChart] 图表容器未准备好');
+    setTimeout(initChart, 100);
+    return;
+  }
+  
+  // 如果已有实例且正在加载数据，则直接返回
+  if (chartInstance && props.loading) {
+    console.log('[BaseChart] 数据仍在加载中，跳过重复初始化');
+    return;
+  }
+
   console.log('[BaseChart] 开始初始化图表');
+  
+  // 确保先销毁已有实例
+  if (chartInstance) {
+    disposeChart();
+  }
 
   try {
-    chartInstance = echarts.init(chartEl.value);
-    console.log('[BaseChart] ECharts实例创建成功');
-    chartInstance.setOption(props.options);
-    console.log('[BaseChart] 图表配置已应用:', props.options);
-    
-    // 响应式容器尺寸变化
-    observer = new ResizeObserver(() => {
-      console.log('[BaseChart] 检测到容器尺寸变化，重新调整图表');
-      chartInstance?.resize();
-    });
-    observer.observe(chartEl.value);
-    console.log('[BaseChart] 已添加容器尺寸监听器');
+    // 确保options有数据且容器有尺寸
+    if (Object.keys(props.options).length > 0 && chartEl.value.offsetWidth > 0 && chartEl.value.offsetHeight > 0) {
+      // 等待loading状态变为false
+      if (props.loading) {
+        console.log('[BaseChart] 数据仍在加载中，延迟初始化');
+        setTimeout(initChart, 100);
+        return;
+      }
+      
+      // 确保没有重复创建实例
+      if (!chartInstance) {
+        chartInstance = echarts.init(chartEl.value);
+        console.log('[BaseChart] ECharts实例创建成功');
+      }
+      
+      // 设置图表配置
+      chartInstance.setOption({
+        ...props.options,
+        notMerge: true
+      }, true);
+      console.log('[BaseChart] 图表配置已应用:', props.options);
+      
+      // 响应式容器尺寸变化
+      if (!observer) {
+        observer = new ResizeObserver(() => {
+          console.log('[BaseChart] 检测到容器尺寸变化，重新调整图表');
+          chartInstance?.resize();
+        });
+        observer.observe(chartEl.value);
+        console.log('[BaseChart] 已添加容器尺寸监听器');
+      }
+    } else {
+      console.warn('[BaseChart] 图表数据未准备好或容器尺寸为0,延迟初始化');
+      setTimeout(initChart, 100);
+    }
   } catch (error) {
     console.error('[BaseChart] 图表初始化失败:', error);
+    // 初始化失败时清理资源
+    disposeChart();
   }
 };
 
@@ -68,12 +109,24 @@ const disposeChart = () => {
   }
 };
 
-watch(() => props.options, (newVal) => {
-  if (chartInstance) {
-    console.log('[BaseChart] 检测到图表配置更新:', newVal);
-    chartInstance.setOption(newVal);
+watch(() => props.loading, (newVal) => {
+  console.log('[BaseChart] 检测到loading状态变化:', newVal);
+  if (!newVal && Object.keys(props.options).length > 0) {
+    disposeChart();
+    initChart();
   }
-}, { deep: true });
+}, { immediate: true });
+
+watch(() => props.options, (newVal) => {
+  console.log('[BaseChart] 检测到图表配置更新:', newVal);
+  if (!props.loading && Object.keys(props.options).length > 0) {
+    disposeChart();
+    initChart();
+  } else if (Object.keys(props.options).length === 0) {
+    console.log('[BaseChart] 图表数据为空，等待数据加载');
+    setTimeout(() => initChart(), 100);
+  }
+}, { deep: true, immediate: true });
 
 onMounted(initChart);
 onUnmounted(disposeChart);
