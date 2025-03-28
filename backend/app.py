@@ -1,4 +1,8 @@
 from flask import Flask, jsonify, request
+import logging
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
 from dotenv import load_dotenv
@@ -224,6 +228,7 @@ def register():
 @app.route('/api/my-data', methods=['GET', 'OPTIONS'])
 @jwt_required()
 def get_user_data():
+    logger.info('开始处理用户数据请求')
     if request.method == 'OPTIONS':
         return _build_cors_preflight_response()
     
@@ -240,7 +245,7 @@ def get_user_data():
         ).get(current_user_id)
         
         if not user:
-            app.logger.warning(f"用户数据查询失败 - 无效用户ID: {current_user_id}")
+            logger.warning(f"用户数据查询失败 - 无效用户ID: {current_user_id}")
             return jsonify({'error': '用户不存在'}), 404
 
         homework = user.homework_statistic[0] if user.homework_statistic else HomeworkStatistic()
@@ -253,6 +258,7 @@ def get_user_data():
         video_watching = VideoWatchingDetail.query.filter_by(id=user.id).first()
         offline_grade = OfflineGrade.query.filter_by(id=user.id).first()
 
+        logger.info(f'返回用户数据: {user.id}')
         return jsonify({
             'user': {
                 'id': user.id,
@@ -267,7 +273,9 @@ def get_user_data():
                     getattr(homework, 'score4', 0) if homework else 0,
                     getattr(homework, 'score5', 0) if homework else 0,
                     getattr(homework, 'score6', 0) if homework else 0,
-                    getattr(homework, 'score7', 0) if homework else 0
+                    getattr(homework, 'score7', 0) if homework else 0,
+                    getattr(homework, 'score8', 0) if homework else 0,
+                    getattr(homework, 'score9', 0) if homework else 0
                 ],
                 'offline': offline_grade.comprehensive_score if offline_grade else 0,
                 'exam': exam.score if exam else 0
@@ -301,7 +309,7 @@ def get_user_data():
             }
         }), 200
     except Exception as e:
-        app.logger.error(f'数据查询失败: {str(e)}')
+        logger.error(f'数据查询失败: {str(e)}')
         return jsonify({'error': '获取数据失败', 'detail': str(e)}), 500
 
 
@@ -326,8 +334,45 @@ def get_chart_data():
     if request.method == 'OPTIONS':
         return _build_cors_preflight_response()
     
-    # 这里添加获取图表数据的逻辑
-    return jsonify({"status": 0, "msg": "获取图表数据成功", "data": []})
+    # 获取当前用户ID
+    user_id = request.args.get('id')
+    if not user_id:
+        return jsonify({"status": 1, "msg": "缺少用户ID参数"})
+    
+    # 查询数据库获取数据
+    homework = HomeworkStatistic.query.get(user_id)
+    exam = ExamStatistic.query.get(user_id)
+    offline = OfflineGrade.query.get(user_id)
+    
+    if not homework or not exam or not offline:
+        return jsonify({"status": 1, "msg": "用户数据不存在"})
+    
+    # 构建返回数据结构
+    data = {
+        "user": {
+            "id": user_id,
+            "name": homework.name
+        },
+        "scores": {
+            "comprehensive": offline.comprehensive_score,
+            "course_points": 0,  
+            "exam": exam.score,
+            "rank": 0,  # 需要根据实际业务逻辑计算
+            "homework": [homework.score2, homework.score3, homework.score4, 
+                         homework.score5, homework.score6, homework.score7,
+                         homework.score8, homework.score9]
+        },
+        "behavior": {
+            "posted": 0,  # 需要从讨论表获取
+            "replied": 0,  # 需要从讨论表获取
+            "upvotes": 0  # 需要从讨论表获取
+        },
+        "progress": {
+            "rumination_ratios": [0] * 42  # 需要从视频观看表获取
+        }
+    }
+    
+    return jsonify({"status": 0, "msg": "获取图表数据成功", "data": data})
 
 
 if __name__ == '__main__':

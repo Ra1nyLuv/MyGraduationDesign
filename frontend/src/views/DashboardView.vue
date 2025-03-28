@@ -99,7 +99,7 @@ const homeworkChartOptions = ref({
   tooltip: { trigger: 'axis' },
   xAxis: {
     type: 'category',
-    data: ['作业2', '作业3', '作业4', '作业5', '作业6', '作业7'],
+    data: ['作业2', '作业3', '作业4', '作业5', '作业6', '作业7', '作业8', '作业9'],
     axisLabel: { rotate: 45 }
   },
   yAxis: { type: 'value' },
@@ -173,11 +173,15 @@ const heatmapOptions = ref({
 // 生命周期钩子
 onMounted(async () => {
   try {
+    console.log('[DashboardView] 开始加载用户数据');
     const { data } = await api.getUserData();
+    console.log('[DashboardView] 用户数据加载完成:', data);
+    
     userInfo.value = data.user;
     scores.value = data.scores;
 
     // 更新图表数据
+    console.log('[DashboardView] 开始更新图表数据');
     homeworkChartOptions.value.series[0].data = data.scores.homework;
     behaviorChartOptions.value.series[0].data = [
       { value: data.behavior.posted, name: '发帖讨论' },
@@ -185,11 +189,14 @@ onMounted(async () => {
       { value: data.behavior.upvotes, name: '获赞数' }
     ];
     heatmapOptions.value.series[0].data = data.progress.rumination_ratios.map((v, i) => [i % 7, Math.floor(i / 7), v]);
+    console.log('[DashboardView] 图表数据更新完成');
 
   } catch (error) {
+    console.error('[DashboardView] 数据加载失败:', error);
     ElMessage.error('数据加载失败');
   } finally {
     loading.value = false;
+    console.log('[DashboardView] 数据加载流程结束');
   }
 });
 
