@@ -1,8 +1,4 @@
 from flask import Flask, jsonify, request
-import logging
-
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
 from dotenv import load_dotenv
@@ -65,6 +61,7 @@ def _build_cors_preflight_response():
     response.headers.add('Access-Control-Allow-Methods', 'POST, GET, OPTIONS, PUT, DELETE')
     response.headers.add('Access-Control-Allow-Credentials', 'true')
     response.headers.add('Access-Control-Max-Age', '86400')
+    response.headers.add('Vary', 'Origin')
     return response
 
 class User(db.Model):
@@ -192,7 +189,8 @@ def login():
         return jsonify({
             "message": "登录成功",
             "id": user.id,
-            "token": access_token
+            "token": access_token,
+            "role": "admin" if user.id.startswith("admin") else "user"
         }), 200
 
     except Exception as e:
@@ -228,7 +226,6 @@ def register():
 @app.route('/api/my-data', methods=['GET', 'OPTIONS'])
 @jwt_required()
 def get_user_data():
-    logger.info('开始处理用户数据请求')
     if request.method == 'OPTIONS':
         return _build_cors_preflight_response()
     
@@ -245,7 +242,7 @@ def get_user_data():
         ).get(current_user_id)
         
         if not user:
-            logger.warning(f"用户数据查询失败 - 无效用户ID: {current_user_id}")
+            app.logger.warning(f"用户数据查询失败 - 无效用户ID: {current_user_id}")
             return jsonify({'error': '用户不存在'}), 404
 
         homework = user.homework_statistic[0] if user.homework_statistic else HomeworkStatistic()
@@ -258,7 +255,6 @@ def get_user_data():
         video_watching = VideoWatchingDetail.query.filter_by(id=user.id).first()
         offline_grade = OfflineGrade.query.filter_by(id=user.id).first()
 
-        logger.info(f'返回用户数据: {user.id}')
         return jsonify({
             'user': {
                 'id': user.id,
@@ -309,7 +305,7 @@ def get_user_data():
             }
         }), 200
     except Exception as e:
-        logger.error(f'数据查询失败: {str(e)}')
+        app.logger.error(f'数据查询失败: {str(e)}')
         return jsonify({'error': '获取数据失败', 'detail': str(e)}), 500
 
 
@@ -374,6 +370,129 @@ def get_chart_data():
     
     return jsonify({"status": 0, "msg": "获取图表数据成功", "data": data})
 
+
+
+
+@app.route('/api/admin-stats', methods=['GET', 'OPTIONS'])
+@jwt_required()
+def get_admin_dashboard_stats():
+    if request.method == 'OPTIONS':
+        response = _build_cors_preflight_response()
+        response.headers.add('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+        response.headers.add('Access-Control-Allow-Methods', 'GET, OPTIONS')
+        response.headers.add('Access-Control-Allow-Credentials', 'true')
+        return response
+    
+    try:
+        # 验证管理员权限
+        current_user_id = get_jwt_identity()
+        print(f'[get_admin_dashboard_stats] 当前管理员ID: {current_user_id}')
+        
+        # 获取排序参数
+        sort_by = request.args.get('sort_by', 'comprehensive_score')
+        sort_order = request.args.get('sort_order', 'desc')
+        print(f'[get_admin_dashboard_stats] 排序参数: sort_by={sort_by}, sort_order={sort_order}')
+        
+        # 使用单个查询获取所有统计数据
+        stats = db.session.query(
+            db.func.count(User.id).label('user_count'),
+            db.func.avg(SynthesisGrade.comprehensive_score).label('avg_comprehensive_score'),
+            db.func.max(SynthesisGrade.comprehensive_score).label('max_comprehensive_score'),
+            db.func.min(SynthesisGrade.comprehensive_score).label('min_comprehensive_score'),
+            db.func.avg(ExamStatistic.score).label('avg_exam_score'),
+            db.func.max(ExamStatistic.score).label('max_exam_score'),
+            db.func.min(ExamStatistic.score).label('min_exam_score'),
+            db.func.sum(
+                db.case(
+                    (DiscussionParticipation.total_discussions > 3, 1),
+                    else_=0
+                )
+            ).label('active_users')
+        ).join(SynthesisGrade, User.id == SynthesisGrade.id, isouter=True)\
+         .join(ExamStatistic, User.id == ExamStatistic.id, isouter=True)\
+         .join(DiscussionParticipation, User.id == DiscussionParticipation.id, isouter=True)\
+         .first()
+        
+        print(f'[get_admin_dashboard_stats] 数据库查询结果: {stats}')
+        
+        # 获取所有学生数据
+        query = db.session.query(
+            User.id,
+            User.name,
+            SynthesisGrade.comprehensive_score,
+            ExamStatistic.score.label('exam_score'),
+            DiscussionParticipation.total_discussions
+        ).join(SynthesisGrade, User.id == SynthesisGrade.id, isouter=True)\
+         .join(ExamStatistic, User.id == ExamStatistic.id, isouter=True)\
+         .join(DiscussionParticipation, User.id == DiscussionParticipation.id, isouter=True)
+        
+        # 应用排序
+        if sort_by == 'comprehensive_score':
+            query = query.order_by(SynthesisGrade.comprehensive_score.desc() if sort_order == 'desc' else SynthesisGrade.comprehensive_score.asc())
+        elif sort_by == 'exam_score':
+            query = query.order_by(ExamStatistic.score.desc() if sort_order == 'desc' else ExamStatistic.score.asc())
+        elif sort_by == 'activity':
+            query = query.order_by(DiscussionParticipation.total_discussions.desc() if sort_order == 'desc' else DiscussionParticipation.total_discussions.asc())
+        
+        students = query.all()
+        
+        # 获取成绩分布
+        score_distribution = db.session.query(
+            db.case(
+                (SynthesisGrade.comprehensive_score >= 90, '优秀'),
+                (SynthesisGrade.comprehensive_score >= 80, '良好'),
+                (SynthesisGrade.comprehensive_score >= 70, '中等'),
+                (SynthesisGrade.comprehensive_score >= 60, '及格'),
+                (db.true(), '不及格'),
+                else_='不及格'
+            ).label('level'),
+            db.func.count().label('count')
+        ).join(User, User.id == SynthesisGrade.id).group_by(db.case(
+            (SynthesisGrade.comprehensive_score >= 90, '优秀'),
+            (SynthesisGrade.comprehensive_score >= 80, '良好'),
+            (SynthesisGrade.comprehensive_score >= 70, '中等'),
+            (SynthesisGrade.comprehensive_score >= 60, '及格'),
+            (db.true(), '不及格'),
+            else_='不及格'
+        )).all()
+        # 构建标准化响应
+        response_data = {
+            "status": 0,
+            "msg": "获取管理员数据成功",
+            "data": {
+                "userCount": stats.user_count or 0,
+                "avgComprehensiveScore": float(stats.avg_comprehensive_score) if stats and stats.avg_comprehensive_score else 0,
+                "maxComprehensiveScore": float(stats.max_comprehensive_score) if stats and stats.max_comprehensive_score else 0,
+                "minComprehensiveScore": float(stats.min_comprehensive_score) if stats and stats.min_comprehensive_score else 0,
+                "avgExamScore": float(stats.avg_exam_score) if stats and stats.avg_exam_score else 0,
+                "maxExamScore": float(stats.max_exam_score) if stats and stats.max_exam_score else 0,
+                "minExamScore": float(stats.min_exam_score) if stats and stats.min_exam_score else 0,
+                "scoreDistribution": {level: count for level, count in score_distribution} if score_distribution else {},
+                "activeUsers": stats.active_users or 0,
+                "inactiveUsers": (stats.user_count or 0) - (stats.active_users or 0),
+                "students": [{
+                    "id": student.id,
+                    "name": student.name,
+                    "comprehensive_score": student.comprehensive_score or 0,
+                    "exam_score": student.exam_score or 0,
+                    "activity": student.total_discussions or 0
+                } for student in students]
+            }
+        }
+        
+        response = jsonify(response_data)
+        response.headers.add('Access-Control-Allow-Origin', 'http://localhost:5173')
+        response.headers.add('Access-Control-Allow-Credentials', 'true')
+        response.headers.add('Access-Control-Allow-Methods', 'GET, OPTIONS')
+        return response, 200
+    except Exception as e:
+        app.logger.error(f"获取管理员数据失败: {str(e)}", exc_info=True)
+        app.logger.error(f"当前用户ID: {current_user_id}")
+        app.logger.error(f"排序参数: sort_by={sort_by}, sort_order={sort_order}")
+        response = jsonify({"status": 1, "msg": f"获取管理员数据失败: {str(e)}"})
+        response.headers.add('Access-Control-Allow-Origin', 'http://localhost:5173')
+        response.headers.add('Access-Control-Allow-Credentials', 'true')
+        return response, 500
 
 if __name__ == '__main__':
     app.run(debug=True)

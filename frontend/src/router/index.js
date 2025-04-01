@@ -15,7 +15,13 @@ const routes = [
     path: '/dashboard',
     name: 'Dashboard',
     component: () => import('@/views/DashboardView.vue'),
-    meta: { requiresAuth: true },
+    meta: { requiresAuth: true, allowedRoles: ['user'] },
+  },
+  {
+    path: '/admin-dashboard',
+    name: 'AdminDashboard',
+    component: () => import('@/views/AdminDashboardView.vue'),
+    meta: { requiresAuth: true, allowedRoles: ['admin'] },
   },
   {
     path: '/',

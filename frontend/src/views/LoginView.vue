@@ -45,8 +45,13 @@ const handleLogin = async () => {
     });
     if (res.status === 200) {
       ElMessage.success('登录成功');
-      localStorage.setItem('access_token', res.data.token); // 如果有 token
-      router.push({ name: 'Dashboard' });
+      localStorage.setItem('access_token', res.data.token);
+      localStorage.setItem('user_role', res.data.role);
+      if (res.data.role === 'admin') {
+        router.push({ name: 'AdminDashboard' });
+      } else {
+        router.push({ name: 'Dashboard' });
+      }
     }
   } catch (error) {
     if (error.response) {

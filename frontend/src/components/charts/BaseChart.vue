@@ -43,6 +43,13 @@ const initChart = () => {
     return;
   }
   
+  // 确保容器已渲染且具有尺寸
+  if (chartEl.value.offsetWidth === 0 || chartEl.value.offsetHeight === 0) {
+    console.warn('[BaseChart] 图表容器尺寸为0，延迟初始化');
+    setTimeout(initChart, 100);
+    return;
+  }
+
   // 如果已有实例且正在加载数据，则直接返回
   if (chartInstance && props.loading) {
     console.log('[BaseChart] 数据仍在加载中，跳过重复初始化');
@@ -57,8 +64,8 @@ const initChart = () => {
   }
 
   try {
-    // 确保options有数据且容器有尺寸
-    if (Object.keys(props.options).length > 0 && chartEl.value.offsetWidth > 0 && chartEl.value.offsetHeight > 0) {
+    // 确保options有数据
+    if (Object.keys(props.options).length > 0) {
       // 等待loading状态变为false
       if (props.loading) {
         console.log('[BaseChart] 数据仍在加载中，延迟初始化');
@@ -89,7 +96,7 @@ const initChart = () => {
         console.log('[BaseChart] 已添加容器尺寸监听器');
       }
     } else {
-      console.warn('[BaseChart] 图表数据未准备好或容器尺寸为0,延迟初始化');
+      console.warn('[BaseChart] 图表数据未准备好,延迟初始化');
       setTimeout(initChart, 100);
     }
   } catch (error) {
@@ -102,7 +109,9 @@ const initChart = () => {
 const disposeChart = () => {
   if (chartInstance) {
     console.log('[BaseChart] 开始销毁图表实例');
-    observer?.unobserve(chartEl.value);
+    if (observer && chartEl.value) {
+      observer.unobserve(chartEl.value);
+    }
     chartInstance.dispose();
     chartInstance = null;
     console.log('[BaseChart] 图表实例已销毁');
