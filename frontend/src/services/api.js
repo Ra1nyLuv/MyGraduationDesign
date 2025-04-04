@@ -50,6 +50,9 @@ export default {
   },
   getAdminStats() {
     return apiClient.get('/api/admin-stats');
+  },
+  addStudent(data) {
+    return apiClient.post('/api/students', data);
   }
   // 待添加其他接口...
 };

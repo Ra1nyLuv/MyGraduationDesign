@@ -379,7 +379,7 @@ def get_admin_dashboard_stats():
     if request.method == 'OPTIONS':
         response = _build_cors_preflight_response()
         response.headers.add('Access-Control-Allow-Headers', 'Content-Type, Authorization')
-        response.headers.add('Access-Control-Allow-Methods', 'GET, OPTIONS')
+        response.headers.add('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
         response.headers.add('Access-Control-Allow-Credentials', 'true')
         return response
     
@@ -419,12 +419,22 @@ def get_admin_dashboard_stats():
         query = db.session.query(
             User.id,
             User.name,
+            User.phone_number,
             SynthesisGrade.comprehensive_score,
             ExamStatistic.score.label('exam_score'),
             DiscussionParticipation.total_discussions
         ).join(SynthesisGrade, User.id == SynthesisGrade.id, isouter=True)\
          .join(ExamStatistic, User.id == ExamStatistic.id, isouter=True)\
          .join(DiscussionParticipation, User.id == DiscussionParticipation.id, isouter=True)
+        
+        # 添加搜索条件
+        search_id = request.args.get('search_id')
+        search_name = request.args.get('search_name')
+        
+        if search_id:
+            query = query.filter(User.id.like(f'%{search_id}%'))
+        if search_name:
+            query = query.filter(User.name.like(f'%{search_name}%'))
         
         # 应用排序
         if sort_by == 'comprehensive_score':
@@ -435,6 +445,26 @@ def get_admin_dashboard_stats():
             query = query.order_by(DiscussionParticipation.total_discussions.desc() if sort_order == 'desc' else DiscussionParticipation.total_discussions.asc())
         
         students = query.all()
+        
+        @app.route('/api/students', methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'])
+        def add_student():
+            try:
+                data = request.get_json()
+                # 这里添加学生数据处理的逻辑
+                response_data = {
+                    "status": 0,
+                    "msg": "学生添加成功",
+                    "data": data
+                }
+                response = jsonify(response_data)
+                response = _build_cors_preflight_response()
+                response.headers.add('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+                response.headers.add('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
+                response.headers.add('Access-Control-Allow-Credentials', 'true')
+                return response, 200
+            except Exception as e:
+                app.logger.error(f"添加学生失败: {str(e)}", exc_info=True)
+                return jsonify({"status": 1, "msg": "添加学生失败"}), 500
         
         # 获取成绩分布
         score_distribution = db.session.query(
@@ -473,9 +503,9 @@ def get_admin_dashboard_stats():
                 "students": [{
                     "id": student.id,
                     "name": student.name,
+                    "phone_number": student.phone_number or '0',
                     "comprehensive_score": student.comprehensive_score or 0,
-                    "exam_score": student.exam_score or 0,
-                    "activity": student.total_discussions or 0
+                    "exam_score": student.exam_score or 0
                 } for student in students]
             }
         }
@@ -483,7 +513,7 @@ def get_admin_dashboard_stats():
         response = jsonify(response_data)
         response.headers.add('Access-Control-Allow-Origin', 'http://localhost:5173')
         response.headers.add('Access-Control-Allow-Credentials', 'true')
-        response.headers.add('Access-Control-Allow-Methods', 'GET, OPTIONS')
+        response.headers.add('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
         return response, 200
     except Exception as e:
         app.logger.error(f"获取管理员数据失败: {str(e)}", exc_info=True)
@@ -493,6 +523,40 @@ def get_admin_dashboard_stats():
         response.headers.add('Access-Control-Allow-Origin', 'http://localhost:5173')
         response.headers.add('Access-Control-Allow-Credentials', 'true')
         return response, 500
+
+@app.route('/api/update-student', methods=['PUT', 'OPTIONS'])
+@jwt_required()
+def update_student():
+    if request.method == 'OPTIONS':
+        return _build_cors_preflight_response()
+    
+    try:
+        data = request.get_json()
+        student_id = data.get('id')
+        if not student_id:
+            return jsonify({"error": "缺少学生ID"}), 400
+            
+        student = User.query.get(student_id)
+        if not student:
+            return jsonify({"error": "学生不存在"}), 404
+            
+        if 'phone_number' in data:
+            student.phone_number = data['phone_number']
+        if 'comprehensive_score' in data:
+            synthesis = SynthesisGrade.query.get(student_id)
+            if synthesis:
+                synthesis.comprehensive_score = data['comprehensive_score']
+        if 'exam_score' in data:
+            exam = ExamStatistic.query.get(student_id)
+            if exam:
+                exam.score = data['exam_score']
+                
+        db.session.commit()
+        return jsonify({"message": "学生信息更新成功"}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": f"更新失败: {str(e)}"}), 500
+
 
 if __name__ == '__main__':
     app.run(debug=True)
