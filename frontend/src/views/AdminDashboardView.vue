@@ -86,10 +86,9 @@
 </el-table-column>
           <el-table-column prop="comprehensive_score" label="综合成绩" />
           <el-table-column prop="exam_score" label="考试成绩" />
-          <el-table-column label="操作" width="200">
-            <template #default="scope">
-              <el-button size="small" @click="handleEdit(scope.row)">编辑</el-button>
-              <el-button size="small" type="danger" @click="handleDelete(scope.row)">删除</el-button>
+          <el-table-column label="状态" width="180">
+            <template #default="{ row }">
+              {{ row.phone_number ? '已完善' : '未完善' }}
             </template>
           </el-table-column>
         </el-table>
@@ -248,39 +247,39 @@ console.log('[AdminDashboardView] 过滤后学生数据:', JSON.parse(JSON.strin
 //   return row.phone_number || '未填写';
 // };
 
-const handleAdd = () => {
-  ElMessageBox.prompt('请输入学生ID,姓名（用逗号分隔）', '添加学生', {
-    confirmButtonText: '确认',
-    cancelButtonText: '取消'
-  }).then(async ({ value }) => {
-    const [id, name] = value.split(',');
-    if (!id || !name) {
-      ElMessage.error('输入的ID和姓名格式不正确，请重新输入');
-      return;
-    }
-    try {
-      await api.addStudent({
-        id: (id),
-        name: name.trim(' '),
-        password: '1234',
-        phone_number: '13900000000',
-        role: 'user',
-        comprehensive_score: 0,
-        exam_score: 0
-      });
-      ElMessage.success('添加成功');
-      const res = await api.getAdminStats();
-      // console.log('[AdminDashboardView] 原始学生数据:', JSON.parse(JSON.stringify(res.data.data.students)));
-studentList.value = res.data.data.students;
-// console.log('[AdminDashboardView] 过滤后学生数据:', JSON.parse(JSON.stringify(studentList.value)));
-    } catch (error) {
-      console.error('添加失败:', error);
-      ElMessage.error('添加失败');
-    }
-  }).catch(() => {
-    ElMessage.info('取消添加');
-  });
-};
+// const handleAdd = () => {
+//   ElMessageBox.prompt('请输入学生ID,姓名（用逗号分隔）', '添加学生', {
+//     confirmButtonText: '确认',
+//     cancelButtonText: '取消'
+//   }).then(async ({ value }) => {
+//     const [id, name] = value.split(',');
+//     if (!id || !name) {
+//       ElMessage.error('输入的ID和姓名格式不正确，请重新输入');
+//       return;
+//     }
+//     try {
+//       await api.addStudent({
+//         id: (id),
+//         name: name.trim(' '),
+//         password: '1234',
+//         phone_number: '13900000000',
+//         role: 'user',
+//         comprehensive_score: 0,
+//         exam_score: 0
+//       });
+//       ElMessage.success('添加成功');
+//       const res = await api.getAdminStats();
+//       // console.log('[AdminDashboardView] 原始学生数据:', JSON.parse(JSON.stringify(res.data.data.students)));
+// studentList.value = res.data.data.students;
+// // console.log('[AdminDashboardView] 过滤后学生数据:', JSON.parse(JSON.stringify(studentList.value)));
+//     } catch (error) {
+//       console.error('添加失败:', error);
+//       ElMessage.error('添加失败');
+//     }
+//   }).catch(() => {
+//     ElMessage.info('取消添加');
+//   });
+// };
 
 const scoreDistributionOptions = ref({
   tooltip: { trigger: 'axis' },

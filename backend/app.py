@@ -445,8 +445,6 @@ def get_admin_dashboard_stats():
             query = query.order_by(DiscussionParticipation.total_discussions.desc() if sort_order == 'desc' else DiscussionParticipation.total_discussions.asc())
         
         students = query.all()
-        
-        @app.route('/api/students', methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'])
         def add_student():
             try:
                 data = request.get_json()

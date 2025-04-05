@@ -47,10 +47,11 @@ const handleLogin = async () => {
       ElMessage.success('登录成功');
       localStorage.setItem('access_token', res.data.token);
       localStorage.setItem('user_role', res.data.role);
+      localStorage.setItem('user_id', res.data.id);
       if (res.data.role === 'admin') {
         router.push({ name: 'AdminDashboard' });
       } else {
-        router.push({ name: 'Dashboard' });
+        router.push({ name: 'Dashboard', params: { userId: res.data.id } });
       }
     }
   } catch (error) {
