@@ -88,7 +88,7 @@
           <el-table-column prop="exam_score" label="考试成绩" />
           <el-table-column label="状态" width="180">
             <template #default="{ row }">
-              {{ row.phone_number ? '已完善' : '未完善' }}
+              <el-button type="primary" size="small" @click="handleView(row)">查看</el-button>
             </template>
           </el-table-column>
         </el-table>
@@ -110,6 +110,7 @@
 
 <script setup>
 import { ref, onMounted } from 'vue';
+import { useRouter } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import api from '@/services/api';
 import BaseChart from '@/components/charts/BaseChart.vue';
@@ -167,6 +168,11 @@ const handleEditSubmit = async () => {
     console.error('修改失败:', error);
     ElMessage.error('修改失败');
   }
+};
+
+const router = useRouter();
+const handleView = (row) => {
+  router.push({ name: 'Dashboard', query: { id: row.id } });
 };
 
 const handleDelete = async (row) => {

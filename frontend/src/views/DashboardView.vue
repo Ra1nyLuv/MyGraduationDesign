@@ -88,7 +88,7 @@
 
 <script setup>
 import { ref, onMounted } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRouter, useRoute } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import api from '@/services/api';
 import BaseChart from '@/components/charts/BaseChart.vue';
@@ -96,6 +96,7 @@ import * as echarts from 'echarts';
 
 const router = useRouter();
 const loading = ref(true);
+const route = useRoute();
 const userInfo = ref({ id: '', name: '' });
 const scores = ref({
   comprehensive: 0,
@@ -190,8 +191,9 @@ const heatmapOptions = ref({
 // 生命周期钩子
 onMounted(async () => {
   try {
+    const studentId = route.query.id || '';
     console.log('[DashboardView] 开始加载用户数据');
-    const { data } = await api.getUserData();
+    const { data } = await api.getUserData(studentId);
     console.log('[DashboardView] 用户数据加载完成:', data);
     
     userInfo.value = data.user;
