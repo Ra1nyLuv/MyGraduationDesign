@@ -51,7 +51,7 @@ const handleLogin = async () => {
       if (res.data.role === 'admin') {
         router.push({ name: 'AdminDashboard' });
       } else {
-        router.push({ name: 'Dashboard', params: { userId: res.data.id } });
+        router.push({ name: 'Dashboard', query: { id: res.data.id } });
       }
     }
   } catch (error) {

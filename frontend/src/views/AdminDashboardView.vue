@@ -88,7 +88,7 @@
           <el-table-column prop="exam_score" label="考试成绩" />
           <el-table-column label="状态" width="180">
             <template #default="{ row }">
-              {{ row.phone_number ? '已完善' : '未完善' }}
+              <el-button type="primary" size="small" @click="handleView(row)">查看</el-button>
             </template>
           </el-table-column>
         </el-table>
@@ -111,10 +111,12 @@
 <script setup>
 import { ref, onMounted } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
+import { useRouter } from 'vue-router';
 import api from '@/services/api';
 import BaseChart from '@/components/charts/BaseChart.vue';
 import * as echarts from 'echarts';
 
+const router = useRouter();
 const userCount = ref(0);
 const activeUsers = ref(0);
 const avgScore = ref(0);
@@ -169,15 +171,22 @@ const handleEditSubmit = async () => {
   }
 };
 
+const handleView = (row) => {
+  router.push({
+    path: '/dashboard',
+    query: { student_id: row.id }
+  });
+};
+
 const handleDelete = async (row) => {
   try {
     await api.deleteStudent(row.id);
     ElMessage.success('删除成功');
     // 刷新数据
     const res = await api.getAdminStats();
-    console.log('[AdminDashboardView] 原始学生数据:', JSON.parse(JSON.stringify(res.data.data.students)));
+    // console.log('[AdminDashboardView] 原始学生数据:', JSON.parse(JSON.stringify(res.data.data.students)));
 studentList.value = res.data.data.students;
-console.log('[AdminDashboardView] 过滤后学生数据:', JSON.parse(JSON.stringify(studentList.value)));
+// console.log('[AdminDashboardView] 过滤后学生数据:', JSON.parse(JSON.stringify(studentList.value)));
     updateFilteredStudents();
   } catch (error) {
     console.error('删除失败:', error);
@@ -233,9 +242,9 @@ const updateFilteredStudents = () => {
 onMounted(async () => {
   try {
     const res = await api.getAdminStats();
-    console.log('[AdminDashboardView] 原始学生数据:', JSON.parse(JSON.stringify(res.data.data.students)));
+    // console.log('[AdminDashboardView] 原始学生数据:', JSON.parse(JSON.stringify(res.data.data.students)));
 studentList.value = res.data.data.students;
-console.log('[AdminDashboardView] 过滤后学生数据:', JSON.parse(JSON.stringify(studentList.value)));
+// console.log('[AdminDashboardView] 过滤后学生数据:', JSON.parse(JSON.stringify(studentList.value)));
     updateFilteredStudents();
   } catch (error) {
     console.error('获取数据失败:', error);
@@ -336,9 +345,9 @@ onMounted(async () => {
       studentList.value = [];
       ElMessage.warning('暂无学生数据');
     } else {
-      console.log('[AdminDashboardView] 原始学生数据:', JSON.parse(JSON.stringify(res.data.data.students)));
+      // console.log('[AdminDashboardView] 原始学生数据:', JSON.parse(JSON.stringify(res.data.data.students)));
 studentList.value = res.data.data.students;
-console.log('[AdminDashboardView] 过滤后学生数据:', JSON.parse(JSON.stringify(studentList.value)));
+// console.log('[AdminDashboardView] 过滤后学生数据:', JSON.parse(JSON.stringify(studentList.value)));
     }
     
     userCount.value = res.data.data.userCount;

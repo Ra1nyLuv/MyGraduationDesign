@@ -40,9 +40,9 @@ export default {
     return apiClient.post('/api/login', data);
   },
   // 数据接口
-  getUserData() {
+  getUserData(params) {
     return apiClient.get('/api/my-data', {
-  
+      params
     });
   },
   getChartData() {

@@ -87,14 +87,15 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
-import { useRouter } from 'vue-router';
+import { ref, onMounted, watch, onBeforeUnmount } from 'vue';
+import { useRouter, useRoute } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import api from '@/services/api';
 import BaseChart from '@/components/charts/BaseChart.vue';
 import * as echarts from 'echarts';
 
 const router = useRouter();
+const route = useRoute();
 const loading = ref(true);
 const userInfo = ref({ id: '', name: '' });
 const scores = ref({
@@ -188,11 +189,20 @@ const heatmapOptions = ref({
 });
 
 // 生命周期钩子
-onMounted(async () => {
+// 监听路由参数变化
+watch(() => route.query.id, (newId) => {
+  if (newId) {
+    loadData(newId);
+  }
+});
+
+const loadData = async (studentId) => {
   try {
-    console.log('[DashboardView] 开始加载用户数据');
-    const { data } = await api.getUserData();
-    console.log('[DashboardView] 用户数据加载完成:', data);
+    loading.value = true;
+    const { data } = await api.getUserData({
+      id: studentId,
+      admin_id: localStorage.getItem('user_id'),
+    });
     
     userInfo.value = data.user;
     scores.value = data.scores;
@@ -200,7 +210,6 @@ onMounted(async () => {
     currentTipIndex.value = Math.floor(Math.random() * tips.value.length);
 
     // 更新图表数据
-    console.log('[DashboardView] 开始更新图表数据');
     homeworkChartOptions.value.series[0].data = data.scores.homework;
     behaviorChartOptions.value.series[0].data = [
       { value: data.behavior.posted, name: '发帖讨论' },
@@ -208,15 +217,24 @@ onMounted(async () => {
       { value: data.behavior.upvotes, name: '获赞数' }
     ];
     heatmapOptions.value.series[0].data = data.progress.rumination_ratios.map((v, i) => [i % 7, Math.floor(i / 7), v]);
-    console.log('[DashboardView] 图表数据更新完成');
-
   } catch (error) {
     console.error('[DashboardView] 数据加载失败:', error);
     ElMessage.error('数据加载失败');
   } finally {
     loading.value = false;
-    console.log('[DashboardView] 数据加载流程结束');
   }
+};
+
+// 修改onMounted中的代码
+onMounted(async () => {
+  const studentId = route.query.student_id || route.query.id || localStorage.getItem('user_id') || '';
+  if (!studentId) {
+    console.error('[DashboardView] 缺少学生ID参数');
+    ElMessage.error('缺少学生ID参数');
+    router.push('/login');
+    return;
+  }
+  await loadData(studentId);
 });
 
 // 事件处理
@@ -226,6 +244,10 @@ const handleLogout = () => {
   router.push('/login');
   ElMessage.success('已安全退出');
 };
+
+onBeforeUnmount(() => {
+  localStorage.removeItem('access_token');
+});
 </script>
 
 <style lang="scss">
