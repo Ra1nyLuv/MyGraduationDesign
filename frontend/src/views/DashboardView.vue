@@ -15,9 +15,19 @@
     <!-- 统计数据面板 -->
     <div class="stat-panel">
       <div class="stat-item">
-        <div class="stat-title">综合成绩</div>
+        <div class="stat-title">综合成绩
+          <el-tag type="success" size="small" style="margin-left: 10px">
+            排名: {{ rank }}
+          </el-tag>
+        </div>
         <div class="stat-value">{{ scores.comprehensive }}</div>
         <el-progress :percentage="scores.comprehensive" :show-text="false" class="stat-progress" />
+        <div class="tips-container" v-if="tips.length > 0">
+          <el-tooltip :content="tips[currentTipIndex]" placement="bottom">
+            <el-icon><InfoFilled /></el-icon>
+            <span style="margin-left: 5px">小贴士</span>
+          </el-tooltip>
+        </div>
       </div>
       <div class="stat-item">
         <div class="stat-title">课程积分</div>
@@ -92,6 +102,13 @@ const scores = ref({
   course_points: 0,
   exam: 0
 });
+const rank = ref(0);
+const tips = ref([
+  '保持良好的学习习惯有助于提高成绩',
+  '定期复习可以巩固知识点',
+  '积极参与讨论有助于理解课程内容'
+]);
+const currentTipIndex = ref(0);
 
 // 图表配置
 const homeworkChartOptions = ref({
@@ -179,6 +196,8 @@ onMounted(async () => {
     
     userInfo.value = data.user;
     scores.value = data.scores;
+    rank.value = data.rank || 0;
+    currentTipIndex.value = Math.floor(Math.random() * tips.value.length);
 
     // 更新图表数据
     console.log('[DashboardView] 开始更新图表数据');
@@ -257,6 +276,16 @@ const handleLogout = () => {
         font-weight: 600;
         color: #303133;
         margin: 1rem 0;
+      }
+      
+      .tips-container {
+        margin-top: 10px;
+        font-size: 0.8rem;
+        color: #909399;
+        cursor: pointer;
+        &:hover {
+          color: #409EFF;
+        }
       }
     }
   }

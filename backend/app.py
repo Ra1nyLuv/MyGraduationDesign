@@ -254,6 +254,11 @@ def get_user_data():
         discussion = DiscussionParticipation.query.filter_by(id=user.id).first()
         video_watching = VideoWatchingDetail.query.filter_by(id=user.id).first()
         offline_grade = OfflineGrade.query.filter_by(id=user.id).first()
+        
+        # 计算排名
+        all_scores = [s.comprehensive_score for s in SynthesisGrade.query.all()]
+        all_scores_sorted = sorted(all_scores, reverse=True)
+        rank = all_scores_sorted.index(synthesis.comprehensive_score) + 1 if synthesis else 0
 
         return jsonify({
             'user': {
@@ -302,7 +307,8 @@ def get_user_data():
                     getattr(video_watching, 'rumination_ratio6', 0) or 0,
                     getattr(video_watching, 'rumination_ratio7', 0) or 0
                 ]
-            }
+            },
+            'rank': rank
         }), 200
     except Exception as e:
         app.logger.error(f'数据查询失败: {str(e)}')
