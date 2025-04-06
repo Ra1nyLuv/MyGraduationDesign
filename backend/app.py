@@ -230,7 +230,11 @@ def get_user_data():
         return _build_cors_preflight_response()
     
     try:
-        current_user_id = get_jwt_identity()  
+        student_id = request.args.get('id')
+        current_user_id = get_jwt_identity()
+        
+        # 管理员可以查看其他学生数据，普通用户只能查看自己数据
+        query_id = student_id if (current_user_id.startswith('admin') and student_id) else current_user_id
         
         user = User.query.options(
             db.joinedload(User.synthesis_grades),
@@ -239,7 +243,7 @@ def get_user_data():
             db.joinedload(User.discussion_participation),
             db.joinedload(User.video_watching_details),
             db.joinedload(User.offline_grades)
-        ).get(current_user_id)
+        ).get(query_id)
         
         if not user:
             app.logger.warning(f"用户数据查询失败 - 无效用户ID: {current_user_id}")
