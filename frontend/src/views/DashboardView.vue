@@ -193,7 +193,7 @@ onMounted(async () => {
   try {
     const studentId = route.query.id || '';
     console.log('[DashboardView] 开始加载用户数据');
-    const { data } = await api.getUserData(studentId);
+    const { data } = await api.getUserData({ id: studentId });
     console.log('[DashboardView] 用户数据加载完成:', data);
     
     userInfo.value = data.user;
