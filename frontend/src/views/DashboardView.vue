@@ -240,14 +240,18 @@ onMounted(async () => {
 // 事件处理
 const goBack = () => history.back();
 const handleLogout = () => {
-  localStorage.removeItem('access_token');
+  if (!route.query.from_admin || !localStorage.getItem('user_role') === 'admin') {
+    localStorage.removeItem('access_token');
+  }
   router.push('/login');
   ElMessage.success('已安全退出');
 };
 
-onBeforeUnmount(() => {
-  localStorage.removeItem('access_token');
-});
+// onBeforeUnmount(() => {
+//   if (!route.query.from_admin || !localStorage.getItem('user_role') === 'admin') {
+//     localStorage.removeItem('access_token');
+//   }
+// });
 </script>
 
 <style lang="scss">

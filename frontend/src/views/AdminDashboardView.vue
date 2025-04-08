@@ -174,7 +174,11 @@ const handleEditSubmit = async () => {
 const handleView = (row) => {
   router.push({
     path: '/dashboard',
-    query: { student_id: row.id }
+    query: { 
+      from_admin: true,
+      student_id: row.id,
+      admin_id: localStorage.getItem('user_id') 
+    }
   });
 };
 
