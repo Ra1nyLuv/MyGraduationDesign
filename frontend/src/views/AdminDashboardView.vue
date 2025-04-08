@@ -172,14 +172,7 @@ const handleEditSubmit = async () => {
 
 const router = useRouter();
 const handleView = (row) => {
-  router.push({
-    path: '/dashboard',
-    query: { 
-      from_admin: true,
-      student_id: row.id,
-      admin_id: localStorage.getItem('user_id') 
-    }
-  });
+  router.push({ name: 'Dashboard', query: { id: row.id } });
 };
 
 const handleDelete = async (row) => {

@@ -224,18 +224,10 @@ onMounted(async () => {
 // 事件处理
 const goBack = () => history.back();
 const handleLogout = () => {
-  if (!route.query.from_admin || !localStorage.getItem('user_role') === 'admin') {
-    localStorage.removeItem('access_token');
-  }
+  localStorage.removeItem('access_token');
   router.push('/login');
   ElMessage.success('已安全退出');
 };
-
-// onBeforeUnmount(() => {
-//   if (!route.query.from_admin || !localStorage.getItem('user_role') === 'admin') {
-//     localStorage.removeItem('access_token');
-//   }
-// });
 </script>
 
 <style lang="scss">

@@ -455,7 +455,26 @@ def get_admin_dashboard_stats():
             query = query.order_by(DiscussionParticipation.total_discussions.desc() if sort_order == 'desc' else DiscussionParticipation.total_discussions.asc())
         
         students = query.all()
+        def add_student():
+            try:
+                data = request.get_json()
+                # 这里添加学生数据处理的逻辑
+                response_data = {
+                    "status": 0,
+                    "msg": "学生添加成功",
+                    "data": data
+                }
+                response = jsonify(response_data)
+                response = _build_cors_preflight_response()
+                response.headers.add('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+                response.headers.add('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
+                response.headers.add('Access-Control-Allow-Credentials', 'true')
+                return response, 200
+            except Exception as e:
+                app.logger.error(f"添加学生失败: {str(e)}", exc_info=True)
+                return jsonify({"status": 1, "msg": "添加学生失败"}), 500
         
+        # 获取成绩分布
         score_distribution = db.session.query(
             db.case(
                 (SynthesisGrade.comprehensive_score >= 90, '优秀'),
