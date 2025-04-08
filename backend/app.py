@@ -17,28 +17,16 @@ from flask_jwt_extended import (
 )
 app = Flask(__name__)
 
+# 加载 .env 文件
 print('正在加载环境变量文件路径:', os.path.join(os.path.dirname(__file__), '..', '.env'))
 load_dotenv(os.path.join(os.path.dirname(__file__), '..', '.env'))
 print(f'环境变量加载状态: JWT_SECRET_KEY={os.getenv("JWT_SECRET_KEY")}, MYSQL_HOST={os.getenv("MYSQL_HOST")}')
 
+# 配置JWT 密钥和数据库连接
 app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY')
 jwt_manager = JWTManager(app)
 app.config['JSONIFY_PRETTYPRINT_REGULAR'] = False
 CORS(app, resources={r"/*": {"origins": "http://localhost:5173"}}, supports_credentials=True)
-
-@app.route('/api/get', methods=['GET'])
-def api_get():
-    query = request.args
-    response = jsonify({
-        "status": 0, 
-        "msg": "GET 请求成功！",
-        "data": dict(query)
-    })
-    response.headers.add('Access-Control-Allow-Origin', '*')
-    return response
-
-
-
 
 app.config['SQLALCHEMY_DATABASE_URI'] = (
     f"mysql+pymysql://{os.getenv('MYSQL_USER')}:{os.getenv('MYSQL_PASSWORD')}@"
@@ -53,7 +41,7 @@ app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY')
 print(f'JWT_SECRET_KEY加载状态: {os.getenv("JWT_SECRET_KEY")}')
 jwt_manager = JWTManager(app)
 
-# 更新预检响应头配置
+# 预检响应头配置
 def _build_cors_preflight_response():
     response = jsonify({'msg': 'Preflight Request'})
     response.headers.add('Access-Control-Allow-Origin', 'http://localhost:5173')
@@ -64,6 +52,7 @@ def _build_cors_preflight_response():
     response.headers.add('Vary', 'Origin')
     return response
 
+# 数据库模型
 class User(db.Model):
     __tablename__ = 'users' # 存储用户数据
     id = db.Column(db.String(80), primary_key=True)
@@ -79,27 +68,8 @@ class SynthesisGrade(db.Model):
     comprehensive_score = db.Column(db.Float, nullable=False)
     user = db.relationship('User', backref='synthesis_grades')
 
-# class StudyProgress(db.Model): # 数据文件中无姓名和id信息, 暂时搁置
-#     __tablename__ = 'study_progress' # 学生学习进度详情
-#     name = db.Column(db.String(80), nullable=False)
-#     task_completed = db.Column(db.Integer, nullable=False)  # 任务完成数
-#     completion_percent = db.Column(db.Float, nullable=False)  # 任务点完成百分比
-#     video_duration = db.Column(db.Integer)  # 视频观看时长(分钟)
-#     discussions = db.Column(db.Integer)  # 讨论数
-#     study_count = db.Column(db.Integer)  # 章节学习次数
-#     study_status = db.Column(db.String(255))  # 学习情况
-#     user = db.relationship('User', backref='study_progress')
-
-# class ChapterStudyTime(db.Model): xlsx文件中的信息不明确, 故暂时搁置
-#     __tablename__ = 'chapter_study_time' # 章节学习次数
-
-
-# class MissionCompletion(db.Model): 暂时搁置
-#     __tablename__ = 'mission_completion' # 任务点完成情况
-
-
 class VideoWatchingDetail(db.Model):
-    __tablename__ = 'video_watching_details'
+    __tablename__ = 'video_watching_details' #音视频观看详情
     id = db.Column(db.String(80), db.ForeignKey('users.id'), primary_key=True)
     name = db.Column(db.String(80), nullable=False)
     rumination_ratio1 = db.Column(db.Float)
@@ -118,7 +88,6 @@ class VideoWatchingDetail(db.Model):
     watch_duration7 = db.Column(db.Float)
     user = db.relationship('User', backref='video_watching_details')
 
-
 class DiscussionParticipation(db.Model):
     __tablename__ = 'discussion_participation' # 章节学习次数
     id = db.Column(db.String(80), db.ForeignKey('users.id'), primary_key=True)
@@ -130,7 +99,6 @@ class DiscussionParticipation(db.Model):
     upvotes_received = db.Column(db.Integer)  # 获赞数
     user = db.relationship('User', backref='discussion_participation')
 
-
 class ExamStatistic(db.Model):
     __tablename__ = 'exam_statistic' # 考试统计
     id = db.Column(db.String(80), db.ForeignKey('users.id'), primary_key=True) # 学号/工号
@@ -138,19 +106,12 @@ class ExamStatistic(db.Model):
     score = db.Column(db.Float, nullable=True) # 成绩
     user = db.relationship('User', backref='exam_statistic')
 
-
-
-# class ChapterExamResult(db.Model): 表格信息缺失, 暂时搁置
-#     __tablename__ = 'chapter_exam_results' # 章节测验统计
-
-
 class OfflineGrade(db.Model):
     __tablename__ = 'offline_grades' # 线下成绩
     id = db.Column(db.String(80), db.ForeignKey('users.id'), primary_key=True)
     name = db.Column(db.String(80), nullable=False)
     comprehensive_score = db.Column(db.Float, nullable=False)
     user = db.relationship('User', backref='offline_grades')
-
 
 class HomeworkStatistic(db.Model):
     __tablename__ = 'homework_statistic'
@@ -166,8 +127,23 @@ class HomeworkStatistic(db.Model):
     score9 = db.Column(db.Float)
     user = db.relationship('User', backref='homework_statistic')
 
+with app.app_context():
+    db.create_all()
 
 
+@app.route('/api/get', methods=['GET'])
+def api_get():
+    query = request.args
+    response = jsonify({
+        "status": 0, 
+        "msg": "GET 请求成功！",
+        "data": dict(query)
+    })
+    response.headers.add('Access-Control-Allow-Origin', '*')
+    return response
+
+
+# 登录接口
 @app.route('/api/login', methods=['POST', 'OPTIONS'])
 def login():
     if request.method == 'OPTIONS':
@@ -196,6 +172,8 @@ def login():
     except Exception as e:
         app.logger.error(f"登录异常: {str(e)}", exc_info=True)
         return jsonify({"error": "登录失败"}), 500
+
+# 注册接口
 @app.route('/api/register', methods=['POST'])
 def register():
     try:
@@ -222,7 +200,7 @@ def register():
         db.session.rollback()
         return jsonify({"error": f"注册失败: {str(e)}"}), 500
 
-
+# 获取用户数据接口
 @app.route('/api/my-data', methods=['GET', 'OPTIONS'])
 @jwt_required()
 def get_user_data():
@@ -318,14 +296,6 @@ def get_user_data():
         app.logger.error(f'数据查询失败: {str(e)}')
         return jsonify({'error': '获取数据失败', 'detail': str(e)}), 500
 
-
-
-with app.app_context():
-    db.create_all()
-
-
-jwt_manager = JWTManager(app)
-
 # 预检请求响应构建函数
 def _build_cors_preflight_response():
     response = jsonify({'msg': 'Preflight Request'})
@@ -335,6 +305,7 @@ def _build_cors_preflight_response():
     response.headers.add('Access-Control-Allow-Credentials', 'true')
     return response
 
+# 用户图表可视化数据接口
 @app.route('/api/chart-data', methods=['GET', 'OPTIONS'])
 def get_chart_data():
     if request.method == 'OPTIONS':
@@ -382,7 +353,7 @@ def get_chart_data():
 
 
 
-
+# 管理员数据看板接口
 @app.route('/api/admin-stats', methods=['GET', 'OPTIONS'])
 @jwt_required()
 def get_admin_dashboard_stats():
@@ -531,39 +502,6 @@ def get_admin_dashboard_stats():
         response.headers.add('Access-Control-Allow-Origin', 'http://localhost:5173')
         response.headers.add('Access-Control-Allow-Credentials', 'true')
         return response, 500
-
-@app.route('/api/update-student', methods=['PUT', 'OPTIONS'])
-@jwt_required()
-def update_student():
-    if request.method == 'OPTIONS':
-        return _build_cors_preflight_response()
-    
-    try:
-        data = request.get_json()
-        student_id = data.get('id')
-        if not student_id:
-            return jsonify({"error": "缺少学生ID"}), 400
-            
-        student = User.query.get(student_id)
-        if not student:
-            return jsonify({"error": "学生不存在"}), 404
-            
-        if 'phone_number' in data:
-            student.phone_number = data['phone_number']
-        if 'comprehensive_score' in data:
-            synthesis = SynthesisGrade.query.get(student_id)
-            if synthesis:
-                synthesis.comprehensive_score = data['comprehensive_score']
-        if 'exam_score' in data:
-            exam = ExamStatistic.query.get(student_id)
-            if exam:
-                exam.score = data['exam_score']
-                
-        db.session.commit()
-        return jsonify({"message": "学生信息更新成功"}), 200
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({"error": f"更新失败: {str(e)}"}), 500
 
 
 if __name__ == '__main__':
