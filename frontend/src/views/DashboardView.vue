@@ -77,6 +77,88 @@
       </el-card>
     </div>
   </div>
+  
+  <!-- 数据分析提示卡片 -->
+  <div class="analysis-cards">
+    <el-card class="analysis-card">
+      <h3>学习习惯分析</h3>
+      <p v-if="scores.comprehensive > 80">你的学习习惯很好，继续保持！</p>
+      <div v-else-if="scores.comprehensive > 60">
+        <p>你的学习习惯良好，但仍有提升空间：</p>
+        <ul>
+          <li v-if="!loading && behaviorChartOptions.value?.series?.[0]?.data?.[0]?.value < 5">建议增加课程讨论参与度，目前发帖{{behaviorChartOptions.value.series[0].data[0].value}}次</li>
+          <li v-if="!loading && heatmapOptions.value?.series?.[0]?.data?.filter(d => d[2] > 5).length < 3">视频学习时段分布不均匀，建议合理安排学习时间</li>
+          <li v-if="!loading && homeworkChartOptions.value?.series?.[0]?.data?.some(score => score < 60)">部分作业成绩不理想，建议加强相关知识点复习</li>
+        </ul>
+      </div>
+      <div v-else>
+        <p>需要改进学习习惯：</p>
+        <ul>
+          <li>综合成绩较低，建议制定系统学习计划</li>
+        </ul>
+      </div>
+    </el-card>
+    
+    <el-card class="analysis-card">
+      <h3>成绩趋势分析</h3>
+      <div v-if="rankPercentage <= 0.1">
+        <p>你的成绩排名前10%(第{{rank}}名)，表现非常优秀！</p>
+        <ul>
+          <li>综合成绩：{{scores.comprehensive}}分</li>
+          <li>考试成绩：{{scores.exam}}分</li>
+          <li>继续保持当前学习状态，争取更高分数</li>
+        </ul>
+      </div>
+      <div v-else-if="rankPercentage <= 0.3">
+        <p>你的成绩排名前10-30%(第{{rank}}名)，表现良好</p>
+        <ul>
+          <li>综合成绩：{{scores.comprehensive}}分</li>
+          <li v-if="scores.exam < scores.comprehensive">考试成绩({{scores.exam}}分)低于综合成绩，建议加强考试技巧</li>
+          <li>分析错题本，针对性提高薄弱环节</li>
+        </ul>
+      </div>
+      <div v-else-if="rankPercentage <= 0.6">
+        <p>你的成绩排名30-60%(第{{rank}}名)，还有较大提升空间</p>
+        <ul>
+          <li>综合成绩：{{scores.comprehensive}}分</li>
+          <li v-if="scores.exam < 70">考试成绩({{scores.exam}}分)不理想，建议多做模拟题</li>
+          <li>制定每周学习计划，保持规律学习</li>
+        </ul>
+      </div>
+      <div v-else-if="rankPercentage <= 0.9">
+        <p>你的成绩排名60-90%(第{{rank}}名)，需要重点关注</p>
+        <ul>
+          <li>综合成绩：{{scores.comprehensive}}分</li>
+          <li v-if="scores.exam < 60">考试成绩({{scores.exam}}分)较差，建议系统复习</li>
+          <li>参加学习小组，向优秀同学请教方法</li>
+        </ul>
+      </div>
+      <div v-else>
+        <p>你的成绩排名后10%(第{{rank}}名)，急需改进</p>
+        <ul>
+          <li>综合成绩：{{scores.comprehensive}}分</li>
+          <li v-if="scores.exam < 50">考试成绩({{scores.exam}}分)非常不理想</li>
+          <li>联系老师或助教，获取个性化辅导</li>
+          <li>每天保证至少3小时专注学习时间</li>
+        </ul>
+      </div>
+    </el-card>
+    
+    <el-card class="analysis-card">
+      <h3>提升建议</h3>
+      <p v-if="scores.exam < 60">考试成绩不理想，建议多做模拟题。</p>
+      <div v-else-if="scores.exam < 80">
+        <p>考试成绩良好({{scores.exam}}分)</p>
+        <ul>
+          <li>建议分析错题，针对性提高</li>
+          <li v-if="!loading && homeworkChartOptions.value?.series?.[0]?.data?.filter(score => score < 70).length > 0">有{{homeworkChartOptions.value.series[0].data.filter(score => score < 70).length}}次作业成绩低于70分</li>
+          <li v-if="!loading && behaviorChartOptions.value?.series?.[0]?.data?.[2]?.value < 5">获赞数较少({{behaviorChartOptions.value.series[0].data[2].value}}次)，建议提高讨论质量</li>
+        </ul>
+      </div>
+      <p v-else>考试成绩优秀，继续保持！</p>
+    </el-card>
+  </div>
+  
   <footer id="footer">
     <div class="container">
       <div class="copyright">Copyright &copy; 2025. <br>莆田学院 新工科产业学院 数据225 <br> 陈俊霖 <br> All rights reserved.</div>
@@ -236,16 +318,17 @@ const handleLogout = () => {
 }
 
 .dashboard-container {
-  padding: 2rem;
-  min-height: 100vh;
-  background: #f5f7fa;
+  padding: 1rem;
+  min-height: 23vh;
+  background: white;
+  border-radius: 12px;
 
   .navbar {
     display: flex;
     justify-content: space-between;
     align-items: center;
     margin-bottom: 2rem;
-    padding: 1rem;
+    padding: 1.3rem;
     background: white;
     border-radius: 12px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
@@ -324,12 +407,61 @@ const handleLogout = () => {
     height: 400px;
   }
 }
+.analysis-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1.5rem;
+  margin: 2rem 0;
+  padding: 0;
+
+  .analysis-card {
+    padding: 1.5rem;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    text-align: left;
+
+    &:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 8px 25px rgba(0, 0, 0, 0.12);
+    }
+
+    h3 {
+      color: #303133;
+      font-size: 1.1rem;
+      margin-bottom: 1rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid #ebeef5;
+    }
+
+    p {
+      color: #606266;
+      font-size: 0.95rem;
+      line-height: 1.6;
+      margin-bottom: 1rem;
+    }
+
+    ul {
+      padding-left: 1.5rem;
+      margin: 0.5rem 0 1rem;
+
+      li {
+        color: #606266;
+        font-size: 0.9rem;
+        line-height: 1.8;
+        margin-bottom: 0.3rem;
+      }
+    }
+  }
+}
+
 #footer {
   padding: 0 0 30px 0;
   color: #677184;
   font-size: 14px;
   text-align: center;
-  background: #f5f7fa;
+  background: white;
   bottom: 0ch;
   opacity: 0.8;
 }

@@ -27,6 +27,12 @@ const routes = [
     path: '/',
     redirect: '/dashboard',
   },
+  {
+    path: '/data-import',
+    name: 'DataImport',
+    component: () => import('@/views/DataImport.vue'),
+    meta: { requiresAuth: true, allowedRoles: ['admin'] },
+  },
 ];
 
 const router = createRouter({

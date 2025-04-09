@@ -79,7 +79,7 @@ const goToRegister = () => {
   justify-content: center;
   align-items: center;
   min-height: 100vh;
-  background: #f8f9fa;
+  background: white;
 }
 
 .auth-card {
@@ -109,7 +109,7 @@ const goToRegister = () => {
   color: #677184;
   font-size: 14px;
   text-align: center;
-  background: #f5f7fa;
+  background: white;
   bottom: 0ch;
   opacity: 0.8;
 }

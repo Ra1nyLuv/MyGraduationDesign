@@ -114,7 +114,7 @@ class OfflineGrade(db.Model):
     user = db.relationship('User', backref='offline_grades')
 
 class HomeworkStatistic(db.Model):
-    __tablename__ = 'homework_statistic'
+    __tablename__ = 'homework_statistic' # 作业统计
     id = db.Column(db.String(80), db.ForeignKey('users.id'), primary_key=True)
     name = db.Column(db.String(80), nullable=False)
     score2 = db.Column(db.Float)
@@ -426,24 +426,6 @@ def get_admin_dashboard_stats():
             query = query.order_by(DiscussionParticipation.total_discussions.desc() if sort_order == 'desc' else DiscussionParticipation.total_discussions.asc())
         
         students = query.all()
-        def add_student():
-            try:
-                data = request.get_json()
-                # 这里添加学生数据处理的逻辑
-                response_data = {
-                    "status": 0,
-                    "msg": "学生添加成功",
-                    "data": data
-                }
-                response = jsonify(response_data)
-                response = _build_cors_preflight_response()
-                response.headers.add('Access-Control-Allow-Headers', 'Content-Type, Authorization')
-                response.headers.add('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
-                response.headers.add('Access-Control-Allow-Credentials', 'true')
-                return response, 200
-            except Exception as e:
-                app.logger.error(f"添加学生失败: {str(e)}", exc_info=True)
-                return jsonify({"status": 1, "msg": "添加学生失败"}), 500
         
         # 获取成绩分布
         score_distribution = db.session.query(
@@ -506,5 +488,76 @@ def get_admin_dashboard_stats():
 
 if __name__ == '__main__':
     app.run(debug=True)
+
+    
+
+# 数据导入API接口
+@app.route('/api/import-data', methods=['POST', 'OPTIONS'])
+@jwt_required()
+def import_data():
+    if request.method == 'OPTIONS':
+        return _build_cors_preflight_response()
+    
+    try:
+        # 验证管理员权限
+        current_user_id = get_jwt_identity()
+        if not current_user_id.startswith('admin'):
+            return jsonify({'error': '无权限执行此操作'}), 403
+            
+        # 检查文件是否存在
+        if 'file' not in request.files:
+            return jsonify({'error': '未上传文件'}), 400
+            
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({'error': '未选择文件'}), 400
+            
+        # 保存临时文件
+        import tempfile
+        import os
+        temp_dir = tempfile.mkdtemp()
+        file_path = os.path.join(temp_dir, file.filename)
+        file.save(file_path)
+        
+        # 根据工作表名称调用对应的导入器
+        results = []
+        excel_file = pd.ExcelFile(file_path)
+        
+        for sheet_name in excel_file.sheet_names:
+            try:
+                if sheet_name == '考试统计':
+                    from backend.database_import.exam_statistic_importer import import_exam_statistics
+                    import_exam_statistics(file_path)
+                    results.append({'sheet': sheet_name, 'success': True, 'message': '导入成功'})
+                elif sheet_name == '作业统计':
+                    from backend.database_import.homework_statistic_importer import import_homework_statistics
+                    import_homework_statistics(file_path)
+                    results.append({'sheet': sheet_name, 'success': True, 'message': '导入成功'})
+                elif sheet_name == '讨论参与':
+                    from backend.database_import.discussion_importer import import_discussion_data
+                    import_discussion_data(file_path)
+                    results.append({'sheet': sheet_name, 'success': True, 'message': '导入成功'})
+                else:
+                    results.append({'sheet': sheet_name, 'success': False, 'message': '不支持的工作表类型'})
+            except Exception as e:
+                app.logger.error(f'工作表{sheet_name}导入失败: {str(e)}', exc_info=True)
+                results.append({'sheet': sheet_name, 'success': False, 'message': f'导入失败: {str(e)}'})
+        
+        # 清理临时文件
+        try:
+            os.remove(file_path)
+            os.rmdir(temp_dir)
+        except Exception as e:
+            app.logger.warning(f'临时文件清理失败: {str(e)}')
+        
+        return jsonify({
+            'success': True,
+            'message': '文件处理完成',
+            'results': results
+        })
+        
+    except Exception as e:
+        app.logger.error(f'数据导入异常: {str(e)}', exc_info=True)
+        return jsonify({'error': '数据处理失败', 'detail': str(e)}), 500
 
     

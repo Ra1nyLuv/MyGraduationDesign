@@ -1,25 +1,9 @@
 <template>
   <div class="admin-dashboard">
-    <el-dialog v-model="editDialogVisible" title="编辑学生信息" width="30%">
-      <el-form :model="editForm" label-width="100px">
-        <el-form-item label="电话号码">
-          <el-input v-model="editForm.phone_number" placeholder="请输入电话号码" />
-        </el-form-item>
-        <el-form-item label="综合成绩">
-          <el-input-number v-model="editForm.comprehensive_score" :min="0" :max="100" />
-        </el-form-item>
-        <el-form-item label="考试成绩">
-          <el-input-number v-model="editForm.exam_score" :min="0" :max="100" />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <span class="dialog-footer">
-          <el-button @click="editDialogVisible = false">取消</el-button>
-          <el-button type="primary" @click="handleEditSubmit">确认</el-button>
-        </span>
-      </template>
-    </el-dialog>
-    <h1>管理员数据看板</h1>
+    <div style="display: flex; justify-content: space-between; align-items: center">
+      <h1>管理员数据看板</h1>
+      <el-button type="primary" @click="goToDataImport">从文件导入数据</el-button>
+    </div>
     <div class="stats-container">
       <el-card class="stat-card">
         <h3>用户总数</h3>
@@ -40,7 +24,7 @@
         <p class="stat-range">最高: {{ maxExamScore.toFixed(2) }} 最低: {{ minExamScore.toFixed(2) }}</p>
       </el-card>
     </div>
-    
+
     <div class="charts-container">
       <el-card class="chart-card">
         <h3>成绩分布</h3>
@@ -48,7 +32,7 @@
           <BaseChart :options="scoreDistributionOptions" />
         </div>
       </el-card>
-      
+
       <el-card class="chart-card">
         <h3>用户活跃度</h3>
         <div class="chart-wrapper">
@@ -56,34 +40,23 @@
         </div>
       </el-card>
     </div>
-    
+
     <div class="student-table-container">
       <el-card>
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px">
           <h3>学生数据管理</h3>
-          <el-input
-            v-model="searchQuery"
-            placeholder="输入学号或姓名搜索"
-            style="width: 300px"
-            clearable
-            @input="updateFilteredStudents"
-            @clear="handleSearchClear"
-          />
+          <el-input v-model="searchQuery" placeholder="输入学号或姓名搜索" style="width: 300px" clearable
+            @input="updateFilteredStudents" @clear="handleSearchClear" />
         </div>
-        <el-table
-  :data="filteredStudentList"
-  border
-  style="width: 100%"
-  @sort-change="handleSortChange"
-  :default-sort="{ prop: 'name', order: 'ascending' }"
->
+        <el-table :data="filteredStudentList" border style="width: 100%" @sort-change="handleSortChange"
+          :default-sort="{ prop: 'name', order: 'ascending' }">
           <el-table-column prop="id" label="学号" width="180" />
           <el-table-column prop="name" label="姓名" width="180" />
           <el-table-column prop="phone_number" label="电话号码" width="180">
-  <template #default="{ row }">
-    {{ row.phone_number || '未填写' }}
-  </template>
-</el-table-column>
+            <template #default="{ row }">
+              {{ row.phone_number || '未填写' }}
+            </template>
+          </el-table-column>
           <el-table-column prop="comprehensive_score" label="综合成绩" />
           <el-table-column prop="exam_score" label="考试成绩" />
           <el-table-column label="状态" width="180">
@@ -93,19 +66,19 @@
           </el-table-column>
         </el-table>
         <div class="table-actions" style="margin-top: 20px">
-          <!-- <el-button type="primary" @click="handleAdd">添加学生</el-button> -->
         </div>
-        <el-pagination
-          :current-page="currentPage"
-          :page-size="pageSize"
-          :total="totalStudents"
-          @current-change="handleCurrentChange"
-          layout="prev, pager, next"
-          style="margin-top: 20px; justify-content: center"
-        />
+        <el-pagination :current-page="currentPage" :page-size="pageSize" :total="totalStudents"
+          @current-change="handleCurrentChange" layout="prev, pager, next"
+          style="margin-top: 20px; justify-content: center" />
       </el-card>
     </div>
   </div>
+  <footer id="footer">
+    <div class="container">
+      <div class="copyright">Copyright &copy; 2025. <br>莆田学院 新工科产业学院 数据225 <br> 陈俊霖 <br> All rights reserved.</div>
+      <div class="credits"></div>
+    </div>
+  </footer>
 </template>
 
 <script setup>
@@ -133,62 +106,14 @@ const totalStudents = ref(0);
 const sortProp = ref('name');
 const sortOrder = ref('ascending');
 
-const editDialogVisible = ref(false);
-const editForm = ref({
-  phone_number: '',
-  comprehensive_score: 0,
-  exam_score: 0
-});
-const currentEditRow = ref(null);
-
-const handleEdit = (row) => {
-  currentEditRow.value = row;
-  editForm.value = {
-    phone_number: row.phone_number || '',
-    comprehensive_score: row.comprehensive_score,
-    exam_score: row.exam_score
-  };
-  editDialogVisible.value = true;
-};
-
-const handleEditSubmit = async () => {
-  try {
-    await api.update({
-      id: currentEditRow.value.id,
-      phone_number: editForm.value.phone_number || null,
-      comprehensive_score: editForm.value.comprehensive_score,
-      exam_score: editForm.value.exam_score
-    });
-    
-    ElMessage.success('修改成功');
-    editDialogVisible.value = false;
-    const res = await api.getAdminStats();
-    studentList.value = res.data.data.students;
-  } catch (error) {
-    console.error('修改失败:', error);
-    ElMessage.error('修改失败');
-  }
-};
 
 const router = useRouter();
-const handleView = (row) => {
-  router.push({ name: 'Dashboard', query: { id: row.id } });
+const goToDataImport = () => {
+  router.push({ name: 'DataImport' });
 };
 
-const handleDelete = async (row) => {
-  try {
-    await api.deleteStudent(row.id);
-    ElMessage.success('删除成功');
-    // 刷新数据
-    const res = await api.getAdminStats();
-    console.log('[AdminDashboardView] 原始学生数据:', JSON.parse(JSON.stringify(res.data.data.students)));
-studentList.value = res.data.data.students;
-console.log('[AdminDashboardView] 过滤后学生数据:', JSON.parse(JSON.stringify(studentList.value)));
-    updateFilteredStudents();
-  } catch (error) {
-    console.error('删除失败:', error);
-    ElMessage.error('删除失败');
-  }
+const handleView = (row) => {
+  router.push({ name: 'Dashboard', query: { id: row.id } });
 };
 
 const handleSortChange = ({ prop, order }) => {
@@ -248,44 +173,6 @@ console.log('[AdminDashboardView] 过滤后学生数据:', JSON.parse(JSON.strin
   }
 });
 
-// const formatPhoneNumber = (row) => {
-//   console.log('[AdminDashboardView] 电话号码数据:', row.phone_number);
-//   return row.phone_number || '未填写';
-// };
-
-// const handleAdd = () => {
-//   ElMessageBox.prompt('请输入学生ID,姓名（用逗号分隔）', '添加学生', {
-//     confirmButtonText: '确认',
-//     cancelButtonText: '取消'
-//   }).then(async ({ value }) => {
-//     const [id, name] = value.split(',');
-//     if (!id || !name) {
-//       ElMessage.error('输入的ID和姓名格式不正确，请重新输入');
-//       return;
-//     }
-//     try {
-//       await api.addStudent({
-//         id: (id),
-//         name: name.trim(' '),
-//         password: '1234',
-//         phone_number: '13900000000',
-//         role: 'user',
-//         comprehensive_score: 0,
-//         exam_score: 0
-//       });
-//       ElMessage.success('添加成功');
-//       const res = await api.getAdminStats();
-//       // console.log('[AdminDashboardView] 原始学生数据:', JSON.parse(JSON.stringify(res.data.data.students)));
-// studentList.value = res.data.data.students;
-// // console.log('[AdminDashboardView] 过滤后学生数据:', JSON.parse(JSON.stringify(studentList.value)));
-//     } catch (error) {
-//       console.error('添加失败:', error);
-//       ElMessage.error('添加失败');
-//     }
-//   }).catch(() => {
-//     ElMessage.info('取消添加');
-//   });
-// };
 
 const scoreDistributionOptions = ref({
   tooltip: { trigger: 'axis' },
@@ -412,5 +299,16 @@ console.log('[AdminDashboardView] 过滤后学生数据:', JSON.parse(JSON.strin
 
 .table-actions {
   margin-top: 20px;
+}
+
+#footer {
+  padding: 0 0 30px 0;
+  color: #677184;
+  font-size: 14px;
+  text-align: center;
+  background: #f5f7fa;
+  bottom: 0ch;
+  opacity: 0.8;
+  background: white;
 }
 </style>
