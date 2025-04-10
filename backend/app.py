@@ -258,6 +258,26 @@ def get_user_data():
                     getattr(homework, 'score8', 0) if homework else 0,
                     getattr(homework, 'score9', 0) if homework else 0
                 ],
+                'missing_homework_count': sum(1 for score in [
+                    getattr(homework, 'score2', 0) if homework else 0,
+                    getattr(homework, 'score3', 0) if homework else 0,
+                    getattr(homework, 'score4', 0) if homework else 0,
+                    getattr(homework, 'score5', 0) if homework else 0,
+                    getattr(homework, 'score6', 0) if homework else 0,
+                    getattr(homework, 'score7', 0) if homework else 0,
+                    getattr(homework, 'score8', 0) if homework else 0,
+                    getattr(homework, 'score9', 0) if homework else 0
+                ] if score == 0),
+                'eligible_for_exam': sum(1 for score in [
+                    getattr(homework, 'score2', 0) if homework else 0,
+                    getattr(homework, 'score3', 0) if homework else 0,
+                    getattr(homework, 'score4', 0) if homework else 0,
+                    getattr(homework, 'score5', 0) if homework else 0,
+                    getattr(homework, 'score6', 0) if homework else 0,
+                    getattr(homework, 'score7', 0) if homework else 0,
+                    getattr(homework, 'score8', 0) if homework else 0,
+                    getattr(homework, 'score9', 0) if homework else 0
+                ] if score == 0) < 4,
                 'offline': offline_grade.comprehensive_score if offline_grade else 0,
                 'exam': exam.score if exam else 0
             },

@@ -73,7 +73,7 @@
             <i class="el-icon-info chart-tooltip" />
           </el-tooltip>
         </div>
-        <BaseChart :options="heatmapOptions" :loading="loading" class="responsive-chart" />
+        <BaseChart :options="studydistributeOptions" :loading="loading" class="responsive-chart" />
       </el-card>
     </div>
   </div>
@@ -81,13 +81,13 @@
   <!-- 数据分析提示卡片 -->
   <div class="analysis-cards">
     <el-card class="analysis-card">
-      <h3>学习习惯分析</h3>
+      <h3>学风与学业分析</h3>
       <p v-if="scores.comprehensive > 80">你的学习习惯很好，继续保持！</p>
       <div v-else-if="scores.comprehensive > 60">
         <p>你的学习习惯良好，但仍有提升空间：</p>
         <ul>
           <li v-if="!loading && behaviorChartOptions.value?.series?.[0]?.data?.[0]?.value < 5">建议增加课程讨论参与度，目前发帖{{behaviorChartOptions.value.series[0].data[0].value}}次</li>
-          <li v-if="!loading && heatmapOptions.value?.series?.[0]?.data?.filter(d => d[2] > 5).length < 3">视频学习时段分布不均匀，建议合理安排学习时间</li>
+          <li v-if="!loading && studydistributeOptions.value?.series?.[0]?.data?.filter(d => d[2] > 5).length < 3">视频学习时段分布不均匀，建议合理安排学习时间</li>
           <li v-if="!loading && homeworkChartOptions.value?.series?.[0]?.data?.some(score => score < 60)">部分作业成绩不理想，建议加强相关知识点复习</li>
         </ul>
       </div>
@@ -246,15 +246,42 @@ const behaviorChartOptions = ref({
   }]
 });
 
-const heatmapOptions = ref({
-  tooltip: { position: 'top' },
+const studydistributeOptions = ref({
+  tooltip: {
+    trigger: 'item',
+    formatter: function(params) {
+      return `${params.name}<br>学习活跃度: ${params.value[2]}<br>${getTimeRangeDescription(params.value[0])}`;
+    }
+  },
+  grid: {
+    left: '3%',
+    right: '4%',
+    bottom: '15%',
+    containLabel: true
+  },
   xAxis: {
     type: 'category',
-    data: ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
+    data: ['6:00', '9:00', '12:00', '15:00', '18:00', '21:00', '24:00'],
+    axisLabel: {
+      rotate: 45,
+      color: '#6c757d',
+      fontWeight: 'bold'
+    },
+    axisLine: {
+      lineStyle: {
+        color: '#6c757d'
+      }
+    },
+    splitArea: {
+      show: true
+    }
   },
   yAxis: {
     type: 'category',
-    data: ['早晨', '上午', '中午', '下午', '傍晚', '晚上']
+    show: false,
+    splitArea: {
+      show: true
+    }
   },
   visualMap: {
     min: 0,
@@ -262,20 +289,40 @@ const heatmapOptions = ref({
     calculable: true,
     orient: 'horizontal',
     left: 'center',
-    bottom: 10
+    bottom: '0%',
+    inRange: {
+      color: ['#f7fbff', '#c6dbef', '#9ecae1', '#6baed6', '#4292c6', '#2171b5', '#08519c', '#08306b']
+    }
   },
   series: [{
+    name: '学习活跃度',
     type: 'heatmap',
     data: [],
-    itemStyle: {
-      borderRadius: [5, 5, 0, 0],
-      color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-        { offset: 0, color: '#FAC858' },
-        { offset: 1, color: '#EE6666' }
-      ])
-    }
+    label: {
+      show: false
+    },
+    emphasis: {
+      itemStyle: {
+        shadowBlur: 10,
+        shadowColor: 'rgba(0, 0, 0, 0.5)'
+      }
+    },
+    progressive: 1000,
+    animation: false
   }]
 });
+
+function getTimeRangeDescription(index) {
+  const descriptions = [
+    '晨间学习效率较高',
+    '上午专注力最佳时段',
+    '午间休息时间',
+    '下午学习黄金时段',
+    '傍晚复习效果较好',
+    '夜间学习需注意休息'
+  ];
+  return descriptions[index] || '';
+}
 
 // 生命周期钩子
 onMounted(async () => {
@@ -301,7 +348,7 @@ onMounted(async () => {
       { value: data.behavior.replied, name: '回复讨论' },
       { value: data.behavior.upvotes, name: '获赞数' }
     ];
-    heatmapOptions.value.series[0].data = data.progress.rumination_ratios.map((v, i) => [i % 7, Math.floor(i / 7), v]);
+    studydistributeOptions.value.series[0].data = data.progress.rumination_ratios.map((v, i) => [i % 7, Math.floor(i / 7), v]);
     console.log('[DashboardView] 图表数据更新完成');
 
   } catch (error) {
