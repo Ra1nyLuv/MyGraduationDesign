@@ -169,7 +169,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, computed } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import api from '@/services/api';
@@ -184,14 +184,21 @@ const scores = ref({
   comprehensive: 0,
   course_points: 0,
   exam: 0
-});
+}); 
 const rank = ref(0);
+const total_students = ref(0);
 const tips = ref([
   '保持良好的学习习惯有助于提高成绩',
   '定期复习可以巩固知识点',
   '积极参与讨论有助于理解课程内容'
 ]);
 const currentTipIndex = ref(0);
+
+// 计算排名百分比
+const rankPercentage = computed(() => {
+  if (total_students.value === 0) return 0;
+  return rank.value / total_students.value;
+});
 
 // 图表配置
 const homeworkChartOptions = ref({
@@ -277,10 +284,13 @@ onMounted(async () => {
     console.log('[DashboardView] 开始加载用户数据');
     const { data } = await api.getUserData({ id: studentId });
     console.log('[DashboardView] 用户数据加载完成:', data);
+    console.log('[DashboardView] 总学生数:', data.total_students);
     
     userInfo.value = data.user;
     scores.value = data.scores;
     rank.value = data.rank || 0;
+    total_students.value = data.total_students || 0;
+    console.log('[DashboardView] totalStudents赋值后:', total_students.value);
     currentTipIndex.value = Math.floor(Math.random() * tips.value.length);
 
     // 更新图表数据

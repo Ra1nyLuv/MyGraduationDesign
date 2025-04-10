@@ -164,9 +164,9 @@ const updateFilteredStudents = () => {
 onMounted(async () => {
   try {
     const res = await api.getAdminStats();
-    console.log('[AdminDashboardView] 原始学生数据:', JSON.parse(JSON.stringify(res.data.data.students)));
+    // console.log('[AdminDashboardView] 原始学生数据:', JSON.parse(JSON.stringify(res.data.data.students)));
 studentList.value = res.data.data.students;
-console.log('[AdminDashboardView] 过滤后学生数据:', JSON.parse(JSON.stringify(studentList.value)));
+// console.log('[AdminDashboardView] 过滤后学生数据:', JSON.parse(JSON.stringify(studentList.value)));
     updateFilteredStudents();
   } catch (error) {
     console.error('获取数据失败:', error);
@@ -216,7 +216,8 @@ onMounted(async () => {
         url: res.config.url,
         headers: res.config.headers
       }
-    });
+    }
+  );
     
     if (!res.data || !res.data.data) {
       console.warn('[AdminDashboardView] API返回数据为空');
@@ -229,9 +230,9 @@ onMounted(async () => {
       studentList.value = [];
       ElMessage.warning('暂无学生数据');
     } else {
-      console.log('[AdminDashboardView] 原始学生数据:', JSON.parse(JSON.stringify(res.data.data.students)));
+      // console.log('[AdminDashboardView] 原始学生数据:', JSON.parse(JSON.stringify(res.data.data.students)));
 studentList.value = res.data.data.students;
-console.log('[AdminDashboardView] 过滤后学生数据:', JSON.parse(JSON.stringify(studentList.value)));
+// console.log('[AdminDashboardView] 过滤后学生数据:', JSON.parse(JSON.stringify(studentList.value)));
     }
     
     userCount.value = res.data.data.userCount;
@@ -246,11 +247,11 @@ console.log('[AdminDashboardView] 过滤后学生数据:', JSON.parse(JSON.strin
     maxExamScore.value = res.data.data.maxExamScore;
     minExamScore.value = res.data.data.minExamScore;
     
-    console.log('[AdminDashboardView] 数据赋值完成:', {
-      userCount: userCount.value,
-      activeUsers: activeUsers.value,
-      avgScore: avgScore.value
-    });
+    // console.log('[AdminDashboardView] 数据赋值完成:', {
+    //   userCount: userCount.value,
+    //   activeUsers: activeUsers.value,
+    //   avgScore: avgScore.value
+    // });
   } catch (error) {
     console.error('[AdminDashboardView] 获取管理员数据失败:', error);
     ElMessage.error('获取管理员数据失败');

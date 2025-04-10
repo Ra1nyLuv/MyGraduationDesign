@@ -211,7 +211,6 @@ def get_user_data():
         student_id = request.args.get('id')
         current_user_id = get_jwt_identity()
         
-        # 管理员可以查看其他学生数据，普通用户只能查看自己数据
         query_id = student_id if (current_user_id.startswith('admin') and student_id) else current_user_id
         
         user = User.query.options(
@@ -241,7 +240,6 @@ def get_user_data():
         all_scores = [s.comprehensive_score for s in SynthesisGrade.query.all()]
         all_scores_sorted = sorted(all_scores, reverse=True)
         rank = all_scores_sorted.index(synthesis.comprehensive_score) + 1 if synthesis else 0
-
         return jsonify({
             'user': {
                 'id': user.id,
@@ -290,7 +288,8 @@ def get_user_data():
                     getattr(video_watching, 'rumination_ratio7', 0) or 0
                 ]
             },
-            'rank': rank
+            'rank': rank,
+            'total_students': len(all_scores_sorted)
         }), 200
     except Exception as e:
         app.logger.error(f'数据查询失败: {str(e)}')
