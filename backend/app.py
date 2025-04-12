@@ -236,6 +236,23 @@ def get_user_data():
         video_watching = VideoWatchingDetail.query.filter_by(id=user.id).first()
         offline_grade = OfflineGrade.query.filter_by(id=user.id).first()
         
+        # 提取作业成绩计算逻辑
+        def get_homework_scores(hw):
+            return [
+                getattr(hw, 'score2', 0) if hw else 0,
+                getattr(hw, 'score3', 0) if hw else 0,
+                getattr(hw, 'score4', 0) if hw else 0,
+                getattr(hw, 'score5', 0) if hw else 0,
+                getattr(hw, 'score6', 0) if hw else 0,
+                getattr(hw, 'score7', 0) if hw else 0,
+                getattr(hw, 'score8', 0) if hw else 0,
+                getattr(hw, 'score9', 0) if hw else 0
+            ]
+
+        homework_scores = get_homework_scores(homework)
+        missing_hw_count = sum(1 for score in homework_scores if score == 0)
+        eligible_for_exam = missing_hw_count < 4
+        
         # 计算排名
         all_scores = [s.comprehensive_score for s in SynthesisGrade.query.all()]
         all_scores_sorted = sorted(all_scores, reverse=True)
@@ -248,36 +265,9 @@ def get_user_data():
             'scores': {
                 'comprehensive': synthesis.comprehensive_score if synthesis else 0,
                 'course_points': synthesis.course_points if synthesis else 0,
-                'homework': [
-                    getattr(homework, 'score2', 0) if homework else 0,
-                    getattr(homework, 'score3', 0) if homework else 0,
-                    getattr(homework, 'score4', 0) if homework else 0,
-                    getattr(homework, 'score5', 0) if homework else 0,
-                    getattr(homework, 'score6', 0) if homework else 0,
-                    getattr(homework, 'score7', 0) if homework else 0,
-                    getattr(homework, 'score8', 0) if homework else 0,
-                    getattr(homework, 'score9', 0) if homework else 0
-                ],
-                'missing_homework_count': sum(1 for score in [
-                    getattr(homework, 'score2', 0) if homework else 0,
-                    getattr(homework, 'score3', 0) if homework else 0,
-                    getattr(homework, 'score4', 0) if homework else 0,
-                    getattr(homework, 'score5', 0) if homework else 0,
-                    getattr(homework, 'score6', 0) if homework else 0,
-                    getattr(homework, 'score7', 0) if homework else 0,
-                    getattr(homework, 'score8', 0) if homework else 0,
-                    getattr(homework, 'score9', 0) if homework else 0
-                ] if score == 0),
-                'eligible_for_exam': sum(1 for score in [
-                    getattr(homework, 'score2', 0) if homework else 0,
-                    getattr(homework, 'score3', 0) if homework else 0,
-                    getattr(homework, 'score4', 0) if homework else 0,
-                    getattr(homework, 'score5', 0) if homework else 0,
-                    getattr(homework, 'score6', 0) if homework else 0,
-                    getattr(homework, 'score7', 0) if homework else 0,
-                    getattr(homework, 'score8', 0) if homework else 0,
-                    getattr(homework, 'score9', 0) if homework else 0
-                ] if score == 0) < 4,
+                'homework': homework_scores,
+                'missing_homework_count': missing_hw_count,
+                'eligible_for_exam': eligible_for_exam,
                 'offline': offline_grade.comprehensive_score if offline_grade else 0,
                 'exam': exam.score if exam else 0
             },

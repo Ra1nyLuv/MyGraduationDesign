@@ -97,6 +97,13 @@
           <li>综合成绩较低，建议制定系统学习计划</li>
         </ul>
       </div>
+      <div>
+        <ul>
+          <li v-if="!loading && scores.missing_homework_count === 0">无作业缺交情况，表现良好请继续保持</li>
+          <li v-else-if="!loading && scores.eligible_for_exam">您已缺交{{scores.missing_homework_count}}次作业，若再有{{4 - scores.missing_homework_count}}次作业未交，将失去期末考试资格</li>
+          <li v-else-if="!loading && !scores.eligible_for_exam">您已缺交{{scores.missing_homework_count}}次作业，失去期末考试资格</li>
+        </ul>
+      </div>
     </el-card>
     
     <el-card class="analysis-card">
@@ -183,7 +190,9 @@ const userInfo = ref({ id: '', name: '' });
 const scores = ref({
   comprehensive: 0,
   course_points: 0,
-  exam: 0
+  exam: 0,
+  missing_homework_count: 0,
+  eligible_for_exam: true
 }); 
 const rank = ref(0);
 const total_students = ref(0);
