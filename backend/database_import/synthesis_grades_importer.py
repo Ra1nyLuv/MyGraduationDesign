@@ -46,7 +46,7 @@ def import_synthesis_grades(file_path):
 
     except (IntegrityError, DataError, DatabaseError) as e:
         db.session.rollback()
-        app.logger.error(f'数据冲突: {str(e)}，受影响记录: {record.__dict__ if 'record' in locals() else '未知'}')
+        # app.logger.error(f'数据冲突: {str(e)}，受影响记录: {record.__dict__ if 'record' in locals() else '未知'}')
         print(f'详细错误: {e.orig.args[1] if hasattr(e, "orig") else str(e)}')
     except ValueError as e:
         db.session.rollback()

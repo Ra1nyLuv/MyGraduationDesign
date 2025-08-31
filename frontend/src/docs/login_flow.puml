@@ -1,0 +1,30 @@
+@startuml
+start
+:用户访问/login页面;
+if (选择注册?) then (是)
+  :跳转/register页面;
+  :填写注册信息;
+  :提交注册请求;
+  :后端创建User记录;
+  stop
+else (否)
+  :输入账号密码;
+  :提交登录请求;
+endif
+
+:后端验证用户凭证;
+if (role == admin?) then (是)
+  :跳转/admin-dashboard;
+  :获取所有学生数据;
+  :生成管理看板;
+  if (点击用户概览?) then (是)
+    :跳转指定用户的/dashboard;
+  endif
+else (普通用户)
+  :跳转/dashboard?userId=xxx;
+  :根据ID查询学习数据;
+  :生成个人数据可视化;
+endif
+:渲染ECharts图表;
+stop
+@enduml

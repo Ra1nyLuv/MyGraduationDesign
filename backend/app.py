@@ -59,6 +59,7 @@ class User(db.Model):
     name = db.Column(db.String(80), nullable=False)
     password = db.Column(db.String(255), nullable=False)
     phone_number = db.Column(db.String(11), nullable=False)
+    role = db.Column(db.String(15), default='user')
 
 class SynthesisGrade(db.Model):
     __tablename__ = 'synthesis_grades' # 综合成绩
@@ -166,7 +167,7 @@ def login():
             "message": "登录成功",
             "id": user.id,
             "token": access_token,
-            "role": "admin" if user.id.startswith("admin") else "user"
+            "role": user.role
         }), 200
 
     except Exception as e:
@@ -498,28 +499,320 @@ def get_admin_dashboard_stats():
 if __name__ == '__main__':
     app.run(debug=True)
 
-    
-
-# 数据导入API接口
-@app.route('/api/import-data', methods=['POST', 'OPTIONS'])
-@jwt_required()
-def import_data():
+# 机器学习API接口
+@app.route('/api/ml/predict-grade', methods=['POST', 'OPTIONS'])
+@jwt_required(optional=True)
+def predict_grade():
+    """预测学生成绩"""
     if request.method == 'OPTIONS':
-        return _build_cors_preflight_response()
+        response = _build_cors_preflight_response()
+        response.headers.add('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+        response.headers.add('Access-Control-Allow-Methods', 'POST, OPTIONS')
+        return response
+    
+    try:
+        from ml_services import GradePredictionModel
+        
+        data = request.get_json()
+        student_id = data.get('student_id')
+        
+        if not student_id:
+            response = jsonify({'error': '缺少学生ID'})
+            response.headers.add('Access-Control-Allow-Origin', 'http://localhost:5173')
+            return response, 400
+        
+        # 获取用户数据
+        user = User.query.options(
+            db.joinedload(User.synthesis_grades),
+            db.joinedload(User.homework_statistic),
+            db.joinedload(User.exam_statistic),
+            db.joinedload(User.discussion_participation),
+            db.joinedload(User.video_watching_details)
+        ).get(student_id)
+        
+        if not user:
+            response = jsonify({'error': '用户不存在'})
+            response.headers.add('Access-Control-Allow-Origin', 'http://localhost:5173')
+            return response, 404
+        
+        # 训练并预测
+        predictor = GradePredictionModel()
+        all_users = User.query.options(
+            db.joinedload(User.synthesis_grades),
+            db.joinedload(User.homework_statistic),
+            db.joinedload(User.discussion_participation),
+            db.joinedload(User.video_watching_details)
+        ).all()
+        
+        if predictor.train_model(all_users):
+            prediction = predictor.predict_grade(user)
+            if prediction:
+                response = jsonify({
+                    'success': True,
+                    'prediction': prediction
+                })
+                response.headers.add('Access-Control-Allow-Origin', 'http://localhost:5173')
+                return response
+        
+        response = jsonify({'error': '预测失败'})
+        response.headers.add('Access-Control-Allow-Origin', 'http://localhost:5173')
+        return response, 500
+        
+    except Exception as e:
+        app.logger.error(f'成绩预测失败: {str(e)}')
+        response = jsonify({'error': '服务暂时不可用'})
+        response.headers.add('Access-Control-Allow-Origin', 'http://localhost:5173')
+        return response, 500
+
+@app.route('/api/ml/cluster-analysis', methods=['GET', 'OPTIONS'])
+@jwt_required(optional=True)
+def cluster_analysis():
+    """学习行为聚类分析"""
+    if request.method == 'OPTIONS':
+        response = _build_cors_preflight_response()
+        response.headers.add('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+        response.headers.add('Access-Control-Allow-Methods', 'GET, OPTIONS')
+        return response
+    
+    try:
+        from ml_services import LearningBehaviorClustering
+        
+        # 获取所有用户数据
+        users = User.query.options(
+            db.joinedload(User.synthesis_grades),
+            db.joinedload(User.homework_statistic),
+            db.joinedload(User.discussion_participation),
+            db.joinedload(User.video_watching_details)
+        ).all()
+        
+        if len(users) < 3:
+            response = jsonify({'error': f'数据量不足进行聚类分析，当前有{len(users)}个用户，至少需要3个'})
+            response.headers.add('Access-Control-Allow-Origin', 'http://localhost:5173')
+            return response, 400
+        
+        clustering = LearningBehaviorClustering()
+        if clustering.train_model(users):
+            analysis = clustering.get_all_clusters_analysis(users)
+            if analysis:
+                response = jsonify({
+                    'success': True,
+                    'analysis': analysis
+                })
+                response.headers.add('Access-Control-Allow-Origin', 'http://localhost:5173')
+                return response
+        
+        response = jsonify({'error': '聚类分析失败'})
+        response.headers.add('Access-Control-Allow-Origin', 'http://localhost:5173')
+        return response, 500
+        
+    except Exception as e:
+        app.logger.error(f'聚类分析失败: {str(e)}')
+        response = jsonify({'error': '服务暂时不可用'})
+        response.headers.add('Access-Control-Allow-Origin', 'http://localhost:5173')
+        return response, 500
+
+@app.route('/api/ml/recommendations', methods=['POST', 'OPTIONS'])
+@jwt_required(optional=True)
+def get_recommendations():
+    """获取个性化推荐"""
+    if request.method == 'OPTIONS':
+        response = _build_cors_preflight_response()
+        response.headers.add('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+        response.headers.add('Access-Control-Allow-Methods', 'POST, OPTIONS')
+        return response
+    
+    try:
+        from ml_services import PersonalizedRecommendation
+        
+        data = request.get_json()
+        student_id = data.get('student_id')
+        
+        if not student_id:
+            response = jsonify({'error': '缺少学生ID'})
+            response.headers.add('Access-Control-Allow-Origin', 'http://localhost:5173')
+            return response, 400
+        
+        user = User.query.options(
+            db.joinedload(User.synthesis_grades),
+            db.joinedload(User.homework_statistic),
+            db.joinedload(User.discussion_participation),
+            db.joinedload(User.video_watching_details)
+        ).get(student_id)
+        
+        if not user:
+            response = jsonify({'error': '用户不存在'})
+            response.headers.add('Access-Control-Allow-Origin', 'http://localhost:5173')
+            return response, 404
+        
+        recommender = PersonalizedRecommendation()
+        recommendations = recommender.generate_personalized_recommendations(user)
+        
+        if recommendations:
+            response = jsonify({
+                'success': True,
+                'recommendations': recommendations
+            })
+            response.headers.add('Access-Control-Allow-Origin', 'http://localhost:5173')
+            return response
+        
+        response = jsonify({'error': '推荐生成失败'})
+        response.headers.add('Access-Control-Allow-Origin', 'http://localhost:5173')
+        return response, 500
+        
+    except Exception as e:
+        app.logger.error(f'推荐生成失败: {str(e)}')
+        response = jsonify({'error': '服务暂时不可用'})
+        response.headers.add('Access-Control-Allow-Origin', 'http://localhost:5173')
+        return response, 500
+
+@app.route('/api/ml/anomaly-detection', methods=['GET', 'OPTIONS'])
+@jwt_required(optional=True)
+def anomaly_detection():
+    """异常行为检测"""
+    if request.method == 'OPTIONS':
+        response = _build_cors_preflight_response()
+        response.headers.add('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+        response.headers.add('Access-Control-Allow-Methods', 'GET, OPTIONS')
+        return response
+    
+    try:
+        from ml_services import AnomalyDetector
+        
+        users = User.query.options(
+            db.joinedload(User.synthesis_grades),
+            db.joinedload(User.homework_statistic),
+            db.joinedload(User.discussion_participation),
+            db.joinedload(User.video_watching_details)
+        ).all()
+        
+        if len(users) < 3:
+            response = jsonify({'error': f'数据量不足进行异常检测，当前有{len(users)}个用户，至少需要3个'})
+            response.headers.add('Access-Control-Allow-Origin', 'http://localhost:5173')
+            return response, 400
+        
+        detector = AnomalyDetector()
+        if detector.train_model(users):
+            results = detector.batch_detect_anomalies(users)
+            if results:
+                response = jsonify({
+                    'success': True,
+                    'results': results
+                })
+                response.headers.add('Access-Control-Allow-Origin', 'http://localhost:5173')
+                return response
+        
+        response = jsonify({'error': '异常检测失败'})
+        response.headers.add('Access-Control-Allow-Origin', 'http://localhost:5173')
+        return response, 500
+        
+    except Exception as e:
+        app.logger.error(f'异常检测失败: {str(e)}')
+        response = jsonify({'error': '服务暂时不可用'})
+        response.headers.add('Access-Control-Allow-Origin', 'http://localhost:5173')
+        return response, 500
+
+@app.route('/api/ml/train-models', methods=['POST', 'OPTIONS'])
+@jwt_required(optional=True)
+def train_ml_models():
+    """训练所有ML模型"""
+    if request.method == 'OPTIONS':
+        response = _build_cors_preflight_response()
+        response.headers.add('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+        response.headers.add('Access-Control-Allow-Methods', 'POST, OPTIONS')
+        return response
     
     try:
         # 验证管理员权限
         current_user_id = get_jwt_identity()
-        if not current_user_id.startswith('admin'):
-            return jsonify({'error': '无权限执行此操作'}), 403
+        if current_user_id and not current_user_id.startswith('admin'):
+            response = jsonify({'error': '无权限执行此操作'})
+            response.headers.add('Access-Control-Allow-Origin', 'http://localhost:5173')
+            return response, 403
+        
+        from ml_services import GradePredictionModel, LearningBehaviorClustering, AnomalyDetector
+        
+        users = User.query.options(
+            db.joinedload(User.synthesis_grades),
+            db.joinedload(User.homework_statistic),
+            db.joinedload(User.discussion_participation),
+            db.joinedload(User.video_watching_details)
+        ).all()
+        
+        if len(users) < 3:
+            response = jsonify({'error': f'数据量不足进行模型训练，当前有{len(users)}个用户，至少需要3个'})
+            response.headers.add('Access-Control-Allow-Origin', 'http://localhost:5173')
+            return response, 400
+        
+        results = {
+            'prediction_model': False,
+            'clustering_model': False,
+            'anomaly_model': False
+        }
+        
+        # 训练预测模型
+        try:
+            predictor = GradePredictionModel()
+            results['prediction_model'] = predictor.train_model(users)
+        except Exception as e:
+            app.logger.error(f'预测模型训练失败: {str(e)}')
+        
+        # 训练聚类模型
+        try:
+            clustering = LearningBehaviorClustering()
+            results['clustering_model'] = clustering.train_model(users)
+        except Exception as e:
+            app.logger.error(f'聚类模型训练失败: {str(e)}')
+        
+        # 训练异常检测模型
+        try:
+            detector = AnomalyDetector()
+            results['anomaly_model'] = detector.train_model(users)
+        except Exception as e:
+            app.logger.error(f'异常检测模型训练失败: {str(e)}')
+        
+        response = jsonify({
+            'success': True,
+            'results': results,
+            'message': f'模型训练完成，成功训练 {sum(results.values())}/3 个模型'
+        })
+        response.headers.add('Access-Control-Allow-Origin', 'http://localhost:5173')
+        return response
+        
+    except Exception as e:
+        app.logger.error(f'模型训练失败: {str(e)}')
+        response = jsonify({'error': '模型训练失败'})
+        response.headers.add('Access-Control-Allow-Origin', 'http://localhost:5173')
+        return response, 500
+
+# 数据导入API接口
+@app.route('/api/import-data', methods=['POST', 'OPTIONS'])
+@jwt_required(optional=True)
+def import_data():
+    if request.method == 'OPTIONS':
+        response = _build_cors_preflight_response()
+        response.headers.add('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+        response.headers.add('Access-Control-Allow-Methods', 'POST, OPTIONS')
+        return response
+    
+    try:
+        # 验证管理员权限
+        current_user_id = get_jwt_identity()
+        if current_user_id and not current_user_id.startswith('admin'):
+            response = jsonify({'error': '无权限执行此操作'})
+            response.headers.add('Access-Control-Allow-Origin', 'http://localhost:5173')
+            return response, 403
             
         # 检查文件是否存在
         if 'file' not in request.files:
-            return jsonify({'error': '未上传文件'}), 400
+            response = jsonify({'error': '未上传文件'})
+            response.headers.add('Access-Control-Allow-Origin', 'http://localhost:5173')
+            return response, 400
             
         file = request.files['file']
         if file.filename == '':
-            return jsonify({'error': '未选择文件'}), 400
+            response = jsonify({'error': '未选择文件'})
+            response.headers.add('Access-Control-Allow-Origin', 'http://localhost:5173')
+            return response, 400
             
         # 保存临时文件
         import tempfile
@@ -559,14 +852,16 @@ def import_data():
         except Exception as e:
             app.logger.warning(f'临时文件清理失败: {str(e)}')
         
-        return jsonify({
+        response = jsonify({
             'success': True,
             'message': '文件处理完成',
             'results': results
         })
+        response.headers.add('Access-Control-Allow-Origin', 'http://localhost:5173')
+        return response
         
     except Exception as e:
         app.logger.error(f'数据导入异常: {str(e)}', exc_info=True)
-        return jsonify({'error': '数据处理失败', 'detail': str(e)}), 500
-
-    
+        response = jsonify({'error': '数据处理失败', 'detail': str(e)})
+        response.headers.add('Access-Control-Allow-Origin', 'http://localhost:5173')
+        return response, 500

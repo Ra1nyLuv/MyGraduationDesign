@@ -1,7 +1,7 @@
-# 数据可视化项目实践
+# 课程学习数据可视化分析系统
 
 ## 项目介绍
-本项目是一个基于Vue.js和Flask的学生学习数据可视化分析系统，用于展示和分析学生的学习成绩、行为数据等信息。
+本项目是一个基于Vue.js和Flask的PTU数据可视化课程学习数据可视化分析系统，用于展示和分析学生的学习成绩、行为数据等信息。
 该项目采用前后端分离架构，前端使用Vue.js和Element Plus进行开发，后端使用Python Flask和SQLAlchemy进行开发。
 ## 功能特点
 - 学生数据可视化看板
@@ -35,13 +35,30 @@
 - Python 3.9+
 - MySQL 8.0+
 
-### 前端
+### 1.注意自行修改/.env文件配置
+### 2.数据库
+在/backend目录下, 运行`flask db upgrade && flask db migrate
+导入从超星导出的数据可视化课程成绩数据(本项目中为`data/BigData233-234(Python).xlsx`)
+导入脚本已经准备好, 路径:`backend/database_import`
+运行importer脚本后, 数据插入完成
+- user表导入脚本中默认设置普通用户的密码为`1234`
+- 注意数据文件存放路径
+#### 注意:出于安全考虑, 数据文件中无管理员用户数据, 运行导入脚本中未插入管理员账户, 需要在/register页面注册管理员账户, 并手动修改数据库users表将其role字段改为admin, 例如注册了一个id为admin的用户, 例如:
+```
+('admin', '管理员', 'password','13912345678', 'user');
+```
+请手动在数据库端修改role字段为admin, 例如:
+```
+update users set role = 'admin' where id = 'admin';
+```
+
+### 3.前端
 1. 进入frontend目录
 2. 运行 `npm install` 安装依赖
 3. 配置环境变量(如有需要)
 4. 运行 `npm run dev` 启动开发服务器
 
-### 后端
+### 4.后端
 1. 创建Python虚拟环境
 2. 安装依赖 `pip install -r requirements.txt`
 3. 配置数据库连接(修改.env文件)

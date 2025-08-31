@@ -51,5 +51,43 @@ export default {
   getAdminStats() {
     return apiClient.get('/api/admin-stats');
   },
-  // 待添加其他接口...
+
+  // 机器学习相关接口
+  // 成绩预测
+  predictGrade(studentId) {
+    return apiClient.post('/api/ml/predict-grade', {
+      student_id: studentId
+    });
+  },
+
+  // 学习行为聚类分析
+  getClusterAnalysis() {
+    return apiClient.get('/api/ml/cluster-analysis');
+  },
+
+  // 个性化推荐
+  getPersonalizedRecommendations(studentId) {
+    return apiClient.post('/api/ml/recommendations', {
+      student_id: studentId
+    });
+  },
+
+  // 异常行为检测
+  getAnomalyDetection() {
+    return apiClient.get('/api/ml/anomaly-detection');
+  },
+
+  // 训练所有ML模型
+  trainMLModels() {
+    return apiClient.post('/api/ml/train-models');
+  },
+
+  // 数据导入接口
+  importData(formData) {
+    return apiClient.post('/api/import-data', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    });
+  }
 };

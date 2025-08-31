@@ -13,3 +13,10 @@ pytest==7.4.0
 
 # 生产依赖
 gunicorn==20.1.0
+
+# 机器学习依赖
+scikit-learn==1.3.0
+numpy==1.24.3
+pandas==2.0.3
+scipy==1.11.1
+joblib==1.3.2
