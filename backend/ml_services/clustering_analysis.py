@@ -6,85 +6,91 @@
 import numpy as np
 import pandas as pd
 from sklearn.cluster import KMeans
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import RobustScaler
 from sklearn.metrics import silhouette_score
 import joblib
 import logging
 
 class LearningBehaviorClustering:
-    def __init__(self, n_clusters=4):
+    def __init__(self, n_clusters=3):
         self.n_clusters = n_clusters
-        self.model = KMeans(n_clusters=n_clusters, random_state=42)
-        self.scaler = StandardScaler()
+        self.model = KMeans(n_clusters=n_clusters, random_state=42, n_init=10)
+        self.scaler = RobustScaler()  # 更鲁棒的缩放器
         self.is_trained = False
+        self.data_size = 'unknown'
         self.cluster_labels = {
-            0: "积极学习型",
-            1: "稳定学习型", 
+            0: "高效学习型",
+            1: "稳步学习型", 
             2: "需要帮助型",
             3: "观望学习型"
         }
         self.feature_names = [
-            'homework_avg', 'homework_completion_rate', 'discussion_activity',
-            'video_engagement', 'learning_consistency', 'academic_performance'
+            'learning_ability', 'completion_rate', 'engagement_level',
+            'investment_degree', 'consistency_score', 'academic_performance'
         ]
         
     def prepare_features(self, users):
-        """准备聚类特征"""
+        """优化的聚类特征准备"""
         features = []
         user_ids = []
         
         for user in users:
             try:
-                # 作业表现特征
+                # 1. 学习能力指标（基于作业表现）
                 homework = user.homework_statistic[0] if user.homework_statistic else None
                 if homework:
-                    scores = [getattr(homework, f'score{i}', 0) for i in range(2, 10)]
-                    homework_avg = np.mean([s for s in scores if s > 0]) if any(s > 0 for s in scores) else 0
-                    homework_completion_rate = sum(1 for s in scores if s > 0) / len(scores)
+                    scores = [getattr(homework, f'score{i}', 0) or 0 for i in range(2, 10)]
+                    valid_scores = [s for s in scores if s > 0]
+                    learning_ability = np.mean(valid_scores) if valid_scores else 50
+                    completion_rate = len(valid_scores) / len(scores)
                 else:
-                    homework_avg = 0
-                    homework_completion_rate = 0
+                    learning_ability = 50
+                    completion_rate = 0
                 
-                # 讨论活跃度
+                # 2. 参与度指标（综合讨论和互动）
                 discussion = user.discussion_participation[0] if user.discussion_participation else None
                 if discussion:
                     posted = discussion.posted_discussions or 0
                     replied = discussion.replied_discussions or 0
                     upvotes = discussion.upvotes_received or 0
-                    discussion_activity = posted * 2 + replied + upvotes * 0.5
+                    # 加权计算参与度
+                    engagement_level = posted * 2 + replied * 1 + upvotes * 0.5
                 else:
-                    discussion_activity = 0
+                    engagement_level = 0
                 
-                # 视频学习投入度
+                # 3. 学习投入度（视频学习时间）
                 video = user.video_watching_details[0] if user.video_watching_details else None
                 if video:
-                    watch_times = [getattr(video, f'watch_duration{i}', 0) for i in range(1, 8)]
-                    rumination_ratios = [getattr(video, f'rumination_ratio{i}', 0) for i in range(1, 8)]
+                    watch_times = [getattr(video, f'watch_duration{i}', 0) or 0 for i in range(1, 8)]
+                    rumination_ratios = [getattr(video, f'rumination_ratio{i}', 0) or 0 for i in range(1, 8)]
                     
                     total_watch_time = sum(watch_times)
                     avg_rumination = np.mean([r for r in rumination_ratios if r > 0]) if any(r > 0 for r in rumination_ratios) else 0
-                    video_engagement = total_watch_time * (1 + avg_rumination)
+                    
+                    # 投入度 = 观看时间 - 重复观看惩罚
+                    investment_degree = total_watch_time * (1 - min(avg_rumination * 0.5, 0.3))
                 else:
-                    video_engagement = 0
+                    investment_degree = 0
                 
-                # 学习一致性（基于作业提交的规律性）
-                if homework:
-                    scores = [getattr(homework, f'score{i}', 0) for i in range(2, 10)]
-                    non_zero_scores = [s for s in scores if s > 0]
-                    if len(non_zero_scores) > 1:
-                        learning_consistency = 1 / (1 + np.std(non_zero_scores) / np.mean(non_zero_scores))
-                    else:
-                        learning_consistency = 0
+                # 4. 一致性得分（学习稳定性）
+                if homework and len(valid_scores) > 2:
+                    score_std = np.std(valid_scores)
+                    score_mean = np.mean(valid_scores)
+                    consistency_score = 1.0 / (1.0 + score_std / (score_mean + 1e-6))
                 else:
-                    learning_consistency = 0
+                    consistency_score = 0.5
                 
-                # 学术表现
+                # 5. 学术表现
                 synthesis = user.synthesis_grades[0] if user.synthesis_grades else None
-                academic_performance = synthesis.comprehensive_score if synthesis else 0
+                academic_performance = synthesis.comprehensive_score if synthesis else learning_ability
                 
                 features.append([
-                    homework_avg, homework_completion_rate, discussion_activity,
-                    video_engagement, learning_consistency, academic_performance
+                    learning_ability,      # 学习能力
+                    completion_rate * 100, # 完成率（百分比）
+                    engagement_level,      # 参与度
+                    investment_degree,     # 投入度
+                    consistency_score * 100, # 一致性（百分比）
+                    academic_performance   # 学术表现
                 ])
                 user_ids.append(user.id)
                 
@@ -95,27 +101,40 @@ class LearningBehaviorClustering:
         return np.array(features), user_ids
     
     def train_model(self, users):
-        """训练聚类模型"""
+        """优化的聚类模型训练"""
         try:
             features, user_ids = self.prepare_features(users)
             
             if len(features) < 3:
-                logging.warning(f"数据样本数({len(features)})少于最小要求(3个)，但尝试继续训练")
-                # 调整聚类数为数据数量
-                self.n_clusters = min(self.n_clusters, len(features))
-                self.model = KMeans(n_clusters=self.n_clusters, random_state=42)
-            elif len(features) < self.n_clusters:
-                logging.warning(f"数据样本数({len(features)})少于聚类数({self.n_clusters})，调整聚类数")
-                self.n_clusters = len(features)
-                self.model = KMeans(n_clusters=self.n_clusters, random_state=42)
+                logging.warning(f"聚类数据不足: {len(features)}个样本")
+                return False
             
-            # 数据标准化
+            # 自适应调整聚类数
+            if len(features) < 10:
+                optimal_clusters = min(2, len(features))
+                self.data_size = 'small'
+            elif len(features) < 30:
+                optimal_clusters = min(3, len(features))
+                self.data_size = 'medium'
+            else:
+                optimal_clusters = min(4, len(features))
+                self.data_size = 'large'
+            
+            if optimal_clusters != self.n_clusters:
+                self.n_clusters = optimal_clusters
+                self.model = KMeans(n_clusters=self.n_clusters, random_state=42, n_init=10)
+                logging.info(f"自动调整聚类数为: {self.n_clusters}")
+            
+            # 处理异常值
+            features = self._handle_outliers(features)
+            
+            # 特征缩放
             features_scaled = self.scaler.fit_transform(features)
             
             # 训练聚类模型
             self.model.fit(features_scaled)
             
-            # 计算聚类质量
+            # 评估聚类效果
             if len(features) > self.n_clusters:
                 silhouette_avg = silhouette_score(features_scaled, self.model.labels_)
                 logging.info(f"聚类完成 - 轮廓系数: {silhouette_avg:.3f}")
@@ -130,6 +149,25 @@ class LearningBehaviorClustering:
         except Exception as e:
             logging.error(f"聚类训练失败: {str(e)}")
             return False
+    
+    def _handle_outliers(self, features):
+        """处理异常值"""
+        features_clean = features.copy()
+        
+        for i in range(features.shape[1]):
+            col = features[:, i]
+            Q1 = np.percentile(col, 25)
+            Q3 = np.percentile(col, 75)
+            IQR = Q3 - Q1
+            
+            if IQR > 0:
+                lower_bound = Q1 - 1.5 * IQR
+                upper_bound = Q3 + 1.5 * IQR
+                
+                # 截断异常值
+                features_clean[:, i] = np.clip(col, lower_bound, upper_bound)
+        
+        return features_clean
     
     def _analyze_clusters(self, features, labels, user_ids):
         """分析各聚类的特征"""

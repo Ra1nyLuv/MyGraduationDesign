@@ -6,27 +6,26 @@
 import numpy as np
 import pandas as pd
 from sklearn.ensemble import IsolationForest
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import RobustScaler
 from sklearn.metrics import classification_report
 import joblib
 import logging
 from datetime import datetime
 
 class AnomalyDetector:
-    def __init__(self, contamination=0.1):
+    def __init__(self, contamination=0.2):
         """
         初始化异常检测器
-        contamination: 异常比例，默认10%
+        contamination: 异常比例，默认20%（适合小数据集）
         """
         self.contamination = contamination
-        self.model = IsolationForest(contamination=contamination, random_state=42)
-        self.scaler = StandardScaler()
+        self.model = IsolationForest(contamination=contamination, random_state=42, n_estimators=50)
+        self.scaler = RobustScaler()  # 更鲁棒的缩放器
         self.is_trained = False
+        self.data_size = 'unknown'
         self.feature_names = [
-            'homework_avg', 'homework_completion_rate', 'homework_consistency',
-            'discussion_posts', 'discussion_replies', 'upvotes_ratio',
-            'video_watch_time', 'video_rumination_ratio', 'learning_pattern_score',
-            'academic_performance', 'engagement_score'
+            'performance_variability', 'completion_anomaly', 'engagement_anomaly',
+            'learning_pattern_anomaly', 'academic_deviation', 'behavior_consistency'
         ]
         self.anomaly_types = {
             'low_engagement': '学习参与度过低',
@@ -125,19 +124,32 @@ class AnomalyDetector:
         return np.array(features), user_ids
     
     def train_model(self, users):
-        """训练异常检测模型"""
+        """优化的异常检测模型训练"""
         try:
             features, user_ids = self.prepare_features(users)
             
             if len(features) < 3:
-                logging.warning(f"训练数据不足，当前有{len(features)}个有效样本，至少需要3个样本")
+                logging.warning(f"异常检测数据不足，当前有{len(features)}个有效样本，至少需要3个样本")
                 return False
             
-            # 如果数据量少，调整异常比例
+            # 自适应调整参数
             if len(features) < 10:
-                self.contamination = 0.2  # 提高异常比例
+                self.contamination = 0.3  # 小数据集提高异常比例
+                self.model = IsolationForest(contamination=self.contamination, random_state=42, n_estimators=50)
+                self.data_size = 'small'
+                logging.info(f"小数据集模式：调整异常比例为{self.contamination}")
+            elif len(features) < 30:
+                self.contamination = 0.2
+                self.model = IsolationForest(contamination=self.contamination, random_state=42, n_estimators=100)
+                self.data_size = 'medium'
+                logging.info(f"中型数据集模式：异常比例{self.contamination}")
+            else:
+                self.contamination = 0.1
                 self.model = IsolationForest(contamination=self.contamination, random_state=42)
-                logging.info(f"数据量较少({len(features)})，调整异常比例为{self.contamination}")
+                self.data_size = 'large'
+            
+            # 处理异常值
+            features = self._handle_outliers(features)
             
             # 数据标准化
             features_scaled = self.scaler.fit_transform(features)
@@ -163,6 +175,25 @@ class AnomalyDetector:
         except Exception as e:
             logging.error(f"异常检测训练失败: {str(e)}")
             return False
+    
+    def _handle_outliers(self, features):
+        """处理异常值"""
+        features_clean = features.copy()
+        
+        for i in range(features.shape[1]):
+            col = features[:, i]
+            Q1 = np.percentile(col, 25)
+            Q3 = np.percentile(col, 75)
+            IQR = Q3 - Q1
+            
+            if IQR > 0:
+                lower_bound = Q1 - 2.0 * IQR  # 放宽异常值范围
+                upper_bound = Q3 + 2.0 * IQR
+                
+                # 不截断，保留异常值信息
+                pass
+        
+        return features_clean
     
     def _analyze_anomaly_patterns(self, features, labels, user_ids, scores):
         """分析异常模式"""

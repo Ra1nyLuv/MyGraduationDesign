@@ -1,27 +1,45 @@
 """
-学习成绩预测模型
-基于历史学习数据预测学生的期末成绩
+优化版机器学习算法
+针对教育数据的特点和小数据集问题进行算法调整
 """
 
 import numpy as np
 import pandas as pd
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.tree import DecisionTreeRegressor
-from sklearn.linear_model import Ridge
+from sklearn.linear_model import LinearRegression, Ridge
+from sklearn.cluster import KMeans, DBSCAN
+from sklearn.ensemble import IsolationForest
+from sklearn.preprocessing import StandardScaler, RobustScaler
 from sklearn.model_selection import train_test_split, cross_val_score
-from sklearn.metrics import mean_squared_error, r2_score
-from sklearn.preprocessing import RobustScaler
+from sklearn.metrics import mean_squared_error, r2_score, silhouette_score
 import joblib
 import os
 import logging
 
-class GradePredictionModel:
-    def __init__(self):
-        # 自适应模型选择
-        self.model = None
-        self.scaler = RobustScaler()  # 更鲁棒的缩放器
+class OptimizedGradePredictionModel:
+    """优化的成绩预测模型"""
+    
+    def __init__(self, data_size='small'):
+        """
+        初始化模型
+        data_size: 'small', 'medium', 'large' 
+        """
+        self.data_size = data_size
+        self.scaler = RobustScaler()  # 使用鲁棒缩放器，对异常值更不敏感
         self.is_trained = False
-        self.data_size = 'unknown'
+        
+        # 根据数据规模选择模型
+        if data_size == 'small':  # < 20 samples
+            self.model = Ridge(alpha=1.0)  # 岭回归，避免过拟合
+            self.min_samples = 3
+        elif data_size == 'medium':  # 20-100 samples
+            self.model = DecisionTreeRegressor(max_depth=5, random_state=42)
+            self.min_samples = 5
+        else:  # > 100 samples
+            self.model = RandomForestRegressor(n_estimators=50, max_depth=10, random_state=42)
+            self.min_samples = 10
+        
         self.feature_names = [
             'homework_avg', 'homework_completion_rate', 'homework_consistency',
             'discussion_activity', 'upvotes_ratio', 'video_engagement',
@@ -41,7 +59,7 @@ class GradePredictionModel:
                     scores = [getattr(homework, f'score{i}', 0) or 0 for i in range(2, 10)]
                     valid_scores = [s for s in scores if s > 0]
                     
-                    homework_avg = np.mean(valid_scores) if valid_scores else 50  # 默认值
+                    homework_avg = np.mean(valid_scores) if valid_scores else 30  # 默认值
                     homework_completion_rate = len(valid_scores) / len(scores)
                     
                     # 作业一致性（新特征）
@@ -50,7 +68,7 @@ class GradePredictionModel:
                     else:
                         homework_consistency = 0.5
                 else:
-                    homework_avg = 50
+                    homework_avg = 30
                     homework_completion_rate = 0
                     homework_consistency = 0.5
                 
@@ -122,31 +140,20 @@ class GradePredictionModel:
         try:
             features, targets = self.prepare_features(users)
             
-            if len(features) < 3:
-                logging.warning(f"训练数据不足，当前有{len(features)}个有效样本，至少需要3个样本")
+            if len(features) < self.min_samples:
+                logging.warning(f"数据不足训练，当前{len(features)}个样本，至少需要{self.min_samples}个")
                 return False
             
-            # 自适应模型选择
-            if len(features) < 15:
+            # 自动调整数据规模
+            if len(features) < 20 and self.data_size != 'small':
                 self.data_size = 'small'
-                self.model = Ridge(alpha=1.0)  # 小数据集使用岭回归
-                min_samples = 3
-                logging.info("使用小数据集模式：岭回归")
-            elif len(features) < 50:
-                self.data_size = 'medium'
-                self.model = DecisionTreeRegressor(max_depth=5, random_state=42)
-                min_samples = 5
-                logging.info("使用中型数据集模式：决策树")
-            else:
-                self.data_size = 'large'
-                self.model = RandomForestRegressor(n_estimators=50, max_depth=10, random_state=42)
-                min_samples = 10
-                logging.info("使用大型数据集模式：随机森林")
+                self.model = Ridge(alpha=1.0)
+                logging.info("自动切换到小数据集模式")
             
             # 处理异常值
             features = self._handle_outliers(features)
             
-            # 数据标准化
+            # 特征缩放
             features_scaled = self.scaler.fit_transform(features)
             
             # 模型训练
@@ -184,17 +191,16 @@ class GradePredictionModel:
             Q3 = np.percentile(col, 75)
             IQR = Q3 - Q1
             
-            if IQR > 0:  # 避免除零错误
-                lower_bound = Q1 - 1.5 * IQR
-                upper_bound = Q3 + 1.5 * IQR
-                
-                # 截断异常值而不是删除
-                features_clean[:, i] = np.clip(col, lower_bound, upper_bound)
+            lower_bound = Q1 - 1.5 * IQR
+            upper_bound = Q3 + 1.5 * IQR
+            
+            # 截断异常值而不是删除
+            features_clean[:, i] = np.clip(col, lower_bound, upper_bound)
         
         return features_clean
     
     def predict_grade(self, user):
-        """预测单个用户的成绩"""
+        """预测成绩"""
         if not self.is_trained:
             return None
             
@@ -209,7 +215,7 @@ class GradePredictionModel:
             # 计算置信度
             confidence = self._calculate_confidence(features[0])
             
-            # 获取特征重要性
+            # 特征重要性（仅对支持的模型）
             feature_importance = self._get_feature_importance()
             
             return {
@@ -278,29 +284,178 @@ class GradePredictionModel:
             recommendations.append("制定学习计划，保持学习的连续性")
         
         return recommendations[:4]  # 最多返回4条建议
+
+
+class OptimizedClusteringModel:
+    """优化的聚类模型"""
     
-    def save_model(self, filepath):
-        """保存模型"""
-        if self.is_trained:
-            model_data = {
-                'model': self.model,
-                'scaler': self.scaler,
-                'feature_names': self.feature_names
-            }
-            joblib.dump(model_data, filepath)
-            return True
-        return False
-    
-    def load_model(self, filepath):
-        """加载模型"""
+    def __init__(self, data_size='small'):
+        self.data_size = data_size
+        self.scaler = RobustScaler()
+        self.is_trained = False
+        
+        # 根据数据规模选择聚类数
+        if data_size == 'small':
+            self.n_clusters = 2
+        elif data_size == 'medium':
+            self.n_clusters = 3
+        else:
+            self.n_clusters = 4
+        
+        self.model = KMeans(n_clusters=self.n_clusters, random_state=42, n_init=10)
+        
+    def train_model(self, users):
+        """训练聚类模型"""
         try:
-            if os.path.exists(filepath):
-                model_data = joblib.load(filepath)
-                self.model = model_data['model']
-                self.scaler = model_data['scaler'] 
-                self.feature_names = model_data['feature_names']
-                self.is_trained = True
-                return True
+            features, user_ids = self._prepare_clustering_features(users)
+            
+            if len(features) < 3:
+                logging.warning(f"聚类数据不足: {len(features)}个样本")
+                return False
+            
+            # 动态调整聚类数
+            optimal_clusters = min(self.n_clusters, len(features))
+            if optimal_clusters != self.n_clusters:
+                self.n_clusters = optimal_clusters
+                self.model = KMeans(n_clusters=self.n_clusters, random_state=42)
+                logging.info(f"调整聚类数为: {self.n_clusters}")
+            
+            # 特征缩放
+            features_scaled = self.scaler.fit_transform(features)
+            
+            # 训练聚类模型
+            self.model.fit(features_scaled)
+            
+            # 评估聚类效果
+            if len(features) > self.n_clusters:
+                silhouette_avg = silhouette_score(features_scaled, self.model.labels_)
+                logging.info(f"聚类完成 - 轮廓系数: {silhouette_avg:.3f}")
+            
+            self.is_trained = True
+            return True
+            
         except Exception as e:
-            logging.error(f"模型加载失败: {str(e)}")
-        return False
+            logging.error(f"聚类训练失败: {str(e)}")
+            return False
+    
+    def _prepare_clustering_features(self, users):
+        """准备聚类特征"""
+        features = []
+        user_ids = []
+        
+        for user in users:
+            try:
+                # 学习能力指标
+                homework = user.homework_statistic[0] if user.homework_statistic else None
+                if homework:
+                    scores = [getattr(homework, f'score{i}', 0) or 0 for i in range(2, 10)]
+                    valid_scores = [s for s in scores if s > 0]
+                    learning_ability = np.mean(valid_scores) if valid_scores else 30
+                    completion_rate = len(valid_scores) / len(scores)
+                else:
+                    learning_ability = 30
+                    completion_rate = 0
+                
+                # 参与度指标
+                discussion = user.discussion_participation[0] if user.discussion_participation else None
+                engagement = (discussion.posted_discussions or 0) + (discussion.replied_discussions or 0) if discussion else 0
+                
+                # 学习投入度
+                video = user.video_watching_details[0] if user.video_watching_details else None
+                if video:
+                    watch_times = [getattr(video, f'watch_duration{i}', 0) or 0 for i in range(1, 8)]
+                    investment = sum(watch_times)
+                else:
+                    investment = 0
+                
+                features.append([learning_ability, completion_rate * 100, engagement, investment])
+                user_ids.append(user.id)
+                
+            except Exception as e:
+                logging.warning(f"处理用户 {user.id} 聚类特征时出错: {str(e)}")
+                continue
+        
+        return np.array(features), user_ids
+
+
+class OptimizedAnomalyDetector:
+    """优化的异常检测模型"""
+    
+    def __init__(self, data_size='small'):
+        self.data_size = data_size
+        self.scaler = RobustScaler()
+        self.is_trained = False
+        
+        # 根据数据规模调整参数
+        if data_size == 'small':
+            self.contamination = 0.3  # 30%异常率，适合小数据集
+            self.model = IsolationForest(contamination=self.contamination, random_state=42, n_estimators=50)
+        else:
+            self.contamination = 0.1  # 10%异常率
+            self.model = IsolationForest(contamination=self.contamination, random_state=42)
+    
+    def train_model(self, users):
+        """训练异常检测模型"""
+        try:
+            features, user_ids = self._prepare_anomaly_features(users)
+            
+            if len(features) < 3:
+                logging.warning(f"异常检测数据不足: {len(features)}个样本")
+                return False
+            
+            # 特征缩放
+            features_scaled = self.scaler.fit_transform(features)
+            
+            # 训练模型
+            self.model.fit(features_scaled)
+            
+            # 分析结果
+            labels = self.model.predict(features_scaled)
+            anomaly_count = sum(1 for label in labels if label == -1)
+            logging.info(f"异常检测完成 - 发现 {anomaly_count}/{len(features)} 个异常")
+            
+            self.is_trained = True
+            return True
+            
+        except Exception as e:
+            logging.error(f"异常检测训练失败: {str(e)}")
+            return False
+    
+    def _prepare_anomaly_features(self, users):
+        """准备异常检测特征"""
+        features = []
+        user_ids = []
+        
+        for user in users:
+            try:
+                # 综合多个维度的异常指标
+                homework = user.homework_statistic[0] if user.homework_statistic else None
+                if homework:
+                    scores = [getattr(homework, f'score{i}', 0) or 0 for i in range(2, 10)]
+                    valid_scores = [s for s in scores if s > 0]
+                    performance_anomaly = np.std(valid_scores) if len(valid_scores) > 1 else 0
+                    completion_anomaly = len(valid_scores) / len(scores)
+                else:
+                    performance_anomaly = 0
+                    completion_anomaly = 0
+                
+                # 行为异常指标
+                discussion = user.discussion_participation[0] if user.discussion_participation else None
+                behavior_anomaly = (discussion.posted_discussions or 0) + (discussion.replied_discussions or 0) if discussion else 0
+                
+                # 学习模式异常
+                video = user.video_watching_details[0] if user.video_watching_details else None
+                if video:
+                    rumination_ratios = [getattr(video, f'rumination_ratio{i}', 0) or 0 for i in range(1, 8)]
+                    pattern_anomaly = np.mean([r for r in rumination_ratios if r > 0]) if any(r > 0 for r in rumination_ratios) else 0
+                else:
+                    pattern_anomaly = 0
+                
+                features.append([performance_anomaly, completion_anomaly, behavior_anomaly, pattern_anomaly])
+                user_ids.append(user.id)
+                
+            except Exception as e:
+                logging.warning(f"处理用户 {user.id} 异常特征时出错: {str(e)}")
+                continue
+        
+        return np.array(features), user_ids

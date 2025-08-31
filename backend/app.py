@@ -15,6 +15,12 @@ from flask_jwt_extended import (
     get_jwt_identity,
     create_access_token
 )
+
+# 修复Windows下KMeans内存泄漏警告
+if os.name == 'nt':  # Windows系统
+    os.environ['OMP_NUM_THREADS'] = '1'
+    print('🔧 Windows环境: 已设置 OMP_NUM_THREADS=1 以避免KMeans内存泄漏警告')
+
 app = Flask(__name__)
 
 # 加载 .env 文件
@@ -724,13 +730,25 @@ def train_ml_models():
     try:
         # 验证管理员权限
         current_user_id = get_jwt_identity()
+        app.logger.info(f'模型训练请求 - 用户ID: {current_user_id}')
+        
         if current_user_id and not current_user_id.startswith('admin'):
+            app.logger.warning(f'非管理员用户尝试训练模型: {current_user_id}')
             response = jsonify({'error': '无权限执行此操作'})
             response.headers.add('Access-Control-Allow-Origin', 'http://localhost:5173')
             return response, 403
         
-        from ml_services import GradePredictionModel, LearningBehaviorClustering, AnomalyDetector
+        app.logger.info('开始导入ML模块...')
+        try:
+            from ml_services import GradePredictionModel, LearningBehaviorClustering, AnomalyDetector
+            app.logger.info('ML模块导入成功')
+        except ImportError as e:
+            app.logger.error(f'ML模块导入失败: {str(e)}')
+            response = jsonify({'error': f'ML模块导入失败: {str(e)}'})
+            response.headers.add('Access-Control-Allow-Origin', 'http://localhost:5173')
+            return response, 500
         
+        app.logger.info('开始查询用户数据...')
         users = User.query.options(
             db.joinedload(User.synthesis_grades),
             db.joinedload(User.homework_statistic),
@@ -738,7 +756,10 @@ def train_ml_models():
             db.joinedload(User.video_watching_details)
         ).all()
         
+        app.logger.info(f'查询到 {len(users)} 个用户')
+        
         if len(users) < 3:
+            app.logger.warning(f'用户数量不足: {len(users)} < 3')
             response = jsonify({'error': f'数据量不足进行模型训练，当前有{len(users)}个用户，至少需要3个'})
             response.headers.add('Access-Control-Allow-Origin', 'http://localhost:5173')
             return response, 400
@@ -749,38 +770,70 @@ def train_ml_models():
             'anomaly_model': False
         }
         
+        errors = []
+        
         # 训练预测模型
+        app.logger.info('开始训练预测模型...')
         try:
             predictor = GradePredictionModel()
             results['prediction_model'] = predictor.train_model(users)
+            app.logger.info(f'预测模型训练结果: {results["prediction_model"]}')
         except Exception as e:
-            app.logger.error(f'预测模型训练失败: {str(e)}')
+            error_msg = f'预测模型训练失败: {str(e)}'
+            app.logger.error(error_msg, exc_info=True)
+            errors.append(error_msg)
         
         # 训练聚类模型
+        app.logger.info('开始训练聚类模型...')
         try:
             clustering = LearningBehaviorClustering()
             results['clustering_model'] = clustering.train_model(users)
+            app.logger.info(f'聚类模型训练结果: {results["clustering_model"]}')
         except Exception as e:
-            app.logger.error(f'聚类模型训练失败: {str(e)}')
+            error_msg = f'聚类模型训练失败: {str(e)}'
+            app.logger.error(error_msg, exc_info=True)
+            errors.append(error_msg)
         
         # 训练异常检测模型
+        app.logger.info('开始训练异常检测模型...')
         try:
             detector = AnomalyDetector()
             results['anomaly_model'] = detector.train_model(users)
+            app.logger.info(f'异常检测训练结果: {results["anomaly_model"]}')
         except Exception as e:
-            app.logger.error(f'异常检测模型训练失败: {str(e)}')
+            error_msg = f'异常检测模型训练失败: {str(e)}'
+            app.logger.error(error_msg, exc_info=True)
+            errors.append(error_msg)
         
+        success_count = sum(results.values())
+        
+        if success_count == 0:
+            # 如果所有模型都训练失败
+            app.logger.error('所有模型训练失败')
+            response = jsonify({
+                'error': '所有模型训练失败',
+                'details': errors,
+                'results': results
+            })
+            response.headers.add('Access-Control-Allow-Origin', 'http://localhost:5173')
+            return response, 500
+        
+        app.logger.info(f'模型训练完成: {success_count}/3 个模型成功')
         response = jsonify({
             'success': True,
             'results': results,
-            'message': f'模型训练完成，成功训练 {sum(results.values())}/3 个模型'
+            'message': f'模型训练完成，成功训练 {success_count}/3 个模型',
+            'errors': errors if errors else None
         })
         response.headers.add('Access-Control-Allow-Origin', 'http://localhost:5173')
         return response
         
     except Exception as e:
-        app.logger.error(f'模型训练失败: {str(e)}')
-        response = jsonify({'error': '模型训练失败'})
+        app.logger.error(f'模型训练过程异常: {str(e)}', exc_info=True)
+        response = jsonify({
+            'error': '模型训练过程异常',
+            'detail': str(e)
+        })
         response.headers.add('Access-Control-Allow-Origin', 'http://localhost:5173')
         return response, 500
 
