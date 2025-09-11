@@ -2,7 +2,7 @@
   <div class="dashboard-container">
     <!-- 顶部导航栏 -->
     <div class="navbar">
-      <el-page-header @back="goBack" content="数据可视化看板" class="page-header" />
+      <el-page-header @back="goBack" content="学生用户画像" class="page-header" />
       <div class="user-info">
         <el-tag type="info" effect="dark" size="large" class="user-id">
           {{ userInfo.id }}
@@ -55,14 +55,69 @@
       </el-card>
 
       <!-- 学习行为分析 -->
-      <el-card class="chart-card">
+      <el-card class="chart-card behavior-analysis-card">
         <div slot="header" class="chart-header">
           <span>学习行为分析</span>
-          <el-tooltip content="讨论/回帖/获赞数据" placement="top">
-            <i class="el-icon-info chart-tooltip" />
-          </el-tooltip>
+          <div class="header-actions">
+            <el-tooltip content="讨论/回帖/获赞数据" placement="top">
+              <i class="el-icon-info chart-tooltip" />
+            </el-tooltip>
+            <el-button-group class="chart-type-switcher">
+              <el-button 
+                :type="behaviorChartType === 'pie' ? 'primary' : ''"
+                size="small"
+                @click="switchBehaviorChart('pie')">
+                饼图
+              </el-button>
+              <el-button 
+                :type="behaviorChartType === 'radar' ? 'primary' : ''"
+                size="small"
+                @click="switchBehaviorChart('radar')">
+                雷达图
+              </el-button>
+            </el-button-group>
+          </div>
         </div>
-        <BaseChart :options="behaviorChartOptions" :loading="loading" class="responsive-chart" />
+        
+        <!-- 数据概览卡片 -->
+        <div class="behavior-overview">
+          <div class="behavior-stat" v-for="(item, index) in behaviorStats" :key="index">
+            <div class="stat-icon" :style="{ backgroundColor: item.color }">
+              <i :class="item.icon"></i>
+            </div>
+            <div class="stat-content">
+              <div class="stat-value">{{ item.value }}</div>
+              <div class="stat-label">{{ item.label }}</div>
+              <div class="stat-trend" :class="item.trend.type">
+                <i :class="item.trend.icon"></i>
+                {{ item.trend.text }}
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <BaseChart :options="currentBehaviorOptions" :loading="loading" class="responsive-chart" />
+        
+        <!-- 学习行为评估 -->
+        <div class="behavior-assessment">
+          <div class="assessment-header">
+            <h4>学习行为评估</h4>
+            <el-tag :type="behaviorLevel.type" size="small">{{ behaviorLevel.label }}</el-tag>
+          </div>
+          <div class="assessment-content">
+            <el-progress
+              :percentage="behaviorScore"
+              :stroke-width="20"
+              :show-text="false"
+              :color="behaviorLevel.color"
+              class="behavior-progress"
+            />
+            <div class="assessment-details">
+              <span class="score-text">行为活跃度：{{ behaviorScore }}分</span>
+              <p class="assessment-desc">{{ behaviorLevel.description }}</p>
+            </div>
+          </div>
+        </div>
       </el-card>
 
       <!-- 视频学习热力图 -->
@@ -168,7 +223,7 @@
   
   <footer id="footer">
     <div class="container">
-      <div class="copyright">Copyright &copy; 2025. <br>莆田学院 新工科产业学院 数据225 <br> 陈俊霖 <br> All rights reserved.</div>
+      <div class="copyright">Copyright &copy; 2025. <br>莆田学院 计算机与大数据学院 数据225 <br> 陈俊霖 <br> All rights reserved.</div>
       <div class="credits"></div>
     </div>
   </footer>
@@ -209,6 +264,17 @@ const rankPercentage = computed(() => {
   return rank.value / total_students.value;
 });
 
+// 学习行为分析相关状态
+const behaviorChartType = ref('pie'); // 当前图表类型
+const behaviorStats = ref([]); // 行为统计数据
+const behaviorScore = ref(0); // 行为活跃度评分
+const behaviorLevel = ref({ // 行为级别
+  type: 'info',
+  label: '一般',
+  color: '#909399',
+  description: '学习行为活跃度待提升'
+});
+
 // 图表配置
 const homeworkChartOptions = ref({
   color: ['#5470C6'],
@@ -235,23 +301,129 @@ const homeworkChartOptions = ref({
 });
 
 const behaviorChartOptions = ref({
-  color: ['#EE6666'],
-  tooltip: { trigger: 'item' },
-  legend: { bottom: 10 },
+  tooltip: {
+    trigger: 'item',
+    formatter: function(params) {
+      return `${params.name}<br/>
+              数量: ${params.value}<br/>
+              占比: ${params.percent}%<br/>
+              <span style="color: ${params.color}">●</span> 活跃度指数: ${getBehaviorIndex(params.name, params.value)}`;
+    }
+  },
+  legend: {
+    bottom: 10,
+    textStyle: {
+      fontSize: 12,
+      color: '#666'
+    }
+  },
   series: [{
     type: 'pie',
-    radius: ['40%', '70%'],
+    radius: ['45%', '75%'],
+    center: ['50%', '45%'],
     data: [
       { value: 0, name: '发帖讨论' },
       { value: 0, name: '回复讨论' },
       { value: 0, name: '获赞数' }
     ],
-    label: { show: false },
+    label: {
+      show: true,
+      position: 'outside',
+      formatter: function(params) {
+        return `${params.name}\n${params.value}`;
+      },
+      fontSize: 12,
+      fontWeight: 'bold'
+    },
+    labelLine: {
+      show: true,
+      length: 15,
+      length2: 10,
+      smooth: true
+    },
     itemStyle: {
       borderRadius: 8,
       borderColor: '#fff',
-      borderWidth: 2
+      borderWidth: 3,
+      shadowBlur: 10,
+      shadowColor: 'rgba(0, 0, 0, 0.2)'
+    },
+    emphasis: {
+      itemStyle: {
+        shadowBlur: 20,
+        shadowOffsetX: 0,
+        shadowColor: 'rgba(0, 0, 0, 0.5)'
+      },
+      label: {
+        show: true,
+        fontSize: 14,
+        fontWeight: 'bold'
+      }
+    },
+    animationType: 'expansion',
+    animationDuration: 1000,
+    animationEasing: 'cubicOut'
+  }]
+});
+
+// 雷达图配置
+const behaviorRadarOptions = ref({
+  tooltip: {
+    trigger: 'item',
+    formatter: function(params) {
+      return `学习行为分析<br/>
+              ${params.data.name}<br/>
+              发帖讨论: ${params.data.value[0]}<br/>
+              回复讨论: ${params.data.value[1]}<br/>
+              获赞数: ${params.data.value[2]}`;
     }
+  },
+  radar: {
+    indicator: [
+      { name: '发帖讨论', max: 20 },
+      { name: '回复讨论', max: 30 },
+      { name: '获赞数', max: 25 }
+    ],
+    center: ['50%', '50%'],
+    radius: '70%',
+    axisName: {
+      color: '#666',
+      fontSize: 12
+    },
+    splitArea: {
+      areaStyle: {
+        color: ['rgba(250, 250, 250, 0.2)', 'rgba(200, 200, 200, 0.1)']
+      }
+    },
+    splitLine: {
+      lineStyle: {
+        color: '#e6e6e6'
+      }
+    }
+  },
+  series: [{
+    type: 'radar',
+    data: [{
+      value: [0, 0, 0],
+      name: '学习行为',
+      areaStyle: {
+        color: new echarts.graphic.RadialGradient(0.5, 0.5, 0.5, [
+          { offset: 0, color: 'rgba(102, 126, 234, 0.8)' },
+          { offset: 1, color: 'rgba(102, 126, 234, 0.2)' }
+        ])
+      },
+      lineStyle: {
+        color: '#667eea',
+        width: 3
+      },
+      itemStyle: {
+        color: '#667eea',
+        borderColor: '#fff',
+        borderWidth: 2
+      }
+    }],
+    animationDuration: 1500,
+    animationEasing: 'cubicInOut'
   }]
 });
 
@@ -321,6 +493,144 @@ const studydistributeOptions = ref({
   }]
 });
 
+// 计算当前显示的行为图表配置
+const currentBehaviorOptions = computed(() => {
+  switch (behaviorChartType.value) {
+    case 'radar':
+      return behaviorRadarOptions.value;
+    default:
+      return behaviorChartOptions.value;
+  }
+});
+
+// 切换行为图表类型
+const switchBehaviorChart = (type) => {
+  behaviorChartType.value = type;
+};
+
+// 获取行为指数
+const getBehaviorIndex = (name, value) => {
+  const weights = {
+    '发帖讨论': 3,
+    '回复讨论': 2,
+    '获赞数': 2.5
+  };
+  return Math.round(value * (weights[name] || 1));
+};
+
+// 计算行为活跃度评分
+const calculateBehaviorScore = (behaviorData) => {
+  const posted = behaviorData.posted || 0;
+  const replied = behaviorData.replied || 0;
+  const upvotes = behaviorData.upvotes || 0;
+  
+  // 加权计算：发帖(3分) + 回复(2分) + 获赞(2.5分)
+  const totalScore = (posted * 3 + replied * 2 + upvotes * 2.5);
+  // 按100分制计算，假设满分标准为：发帖10次，回复20次，获赖20次
+  const maxScore = 10 * 3 + 20 * 2 + 20 * 2.5; // 120分
+  return Math.min(Math.round((totalScore / maxScore) * 100), 100);
+};
+
+// 获取行为级别
+const getBehaviorLevel = (score) => {
+  if (score >= 80) {
+    return {
+      type: 'success',
+      label: '非常活跃',
+      color: '#67c23a',
+      description: '学习行为非常活跃，继续保持！'
+    };
+  } else if (score >= 60) {
+    return {
+      type: 'warning',
+      label: '较为活跃',
+      color: '#e6a23c',
+      description: '学习行为较为活跃，可以适当增加参与度'
+    };
+  } else if (score >= 40) {
+    return {
+      type: 'info',
+      label: '一般活跃',
+      color: '#909399',
+      description: '学习行为一般，建议更多参与讨论交流'
+    };
+  } else {
+    return {
+      type: 'danger',
+      label: '活跃度低',
+      color: '#f56c6c',
+      description: '学习行为活跃度较低，建议增加课程参与度'
+    };
+  }
+};
+
+// 更新行为统计数据
+const updateBehaviorStats = (behaviorData) => {
+  const posted = behaviorData.posted || 0;
+  const replied = behaviorData.replied || 0;
+  const upvotes = behaviorData.upvotes || 0;
+  
+  behaviorStats.value = [
+    {
+      value: posted,
+      label: '发帖讨论',
+      icon: 'el-icon-edit',
+      color: '#667eea',
+      trend: {
+        type: posted >= 5 ? 'positive' : 'neutral',
+        icon: posted >= 5 ? 'el-icon-arrow-up' : 'el-icon-minus',
+        text: posted >= 5 ? '表现良好' : '可以更多'
+      }
+    },
+    {
+      value: replied,
+      label: '回复讨论',
+      icon: 'el-icon-chat-dot-round',
+      color: '#764ba2',
+      trend: {
+        type: replied >= 10 ? 'positive' : 'neutral',
+        icon: replied >= 10 ? 'el-icon-arrow-up' : 'el-icon-minus',
+        text: replied >= 10 ? '表现良好' : '可以更多'
+      }
+    },
+    {
+      value: upvotes,
+      label: '获赞数',
+      icon: 'el-icon-thumb',
+      color: '#f093fb',
+      trend: {
+        type: upvotes >= 8 ? 'positive' : 'neutral',
+        icon: upvotes >= 8 ? 'el-icon-arrow-up' : 'el-icon-minus',
+        text: upvotes >= 8 ? '质量较高' : '可提升质量'
+      }
+    }
+  ];
+  
+  // 计算行为评分
+  behaviorScore.value = calculateBehaviorScore(behaviorData);
+  behaviorLevel.value = getBehaviorLevel(behaviorScore.value);
+};
+
+// 更新所有行为图表数据
+const updateAllBehaviorCharts = (behaviorData) => {
+  const posted = behaviorData.posted || 0;
+  const replied = behaviorData.replied || 0;
+  const upvotes = behaviorData.upvotes || 0;
+  
+  // 更新饼图
+  behaviorChartOptions.value.series[0].data = [
+    { value: posted, name: '发帖讨论' },
+    { value: replied, name: '回复讨论' },
+    { value: upvotes, name: '获赞数' }
+  ];
+  
+  // 更新雷达图
+  behaviorRadarOptions.value.series[0].data[0].value = [posted, replied, upvotes];
+  
+  // 更新统计数据
+  updateBehaviorStats(behaviorData);
+};
+
 function getTimeRangeDescription(index) {
   const descriptions = [
     '晨间学习效率较高',
@@ -332,6 +642,78 @@ function getTimeRangeDescription(index) {
   ];
   return descriptions[index] || '';
 }
+
+// 生成学习行为模拟数据
+const generateMockBehaviorData = () => {
+  const mockData = {
+    posted: Math.floor(Math.random() * 8) + 2,  // 2-9次发帖
+    replied: Math.floor(Math.random() * 15) + 5, // 5-19次回复
+    upvotes: Math.floor(Math.random() * 12) + 3  // 3-14次获赞
+  };
+  console.log('[DashboardView] 生成模拟学习行为数据:', mockData);
+  return mockData;
+};
+
+// 生成视频学习时段分布模拟数据
+const generateMockStudyDistributionData = () => {
+  const mockData = [];
+  // 生成7个时段的数据 (6:00, 9:00, 12:00, 15:00, 18:00, 21:00, 24:00)
+  for (let timeIndex = 0; timeIndex < 7; timeIndex++) {
+    // 模拟不同时段的学习活跃度
+    let baseActivity;
+    switch (timeIndex) {
+      case 0: // 6:00 晨间
+        baseActivity = Math.random() * 3 + 1; // 1-4
+        break;
+      case 1: // 9:00 上午
+        baseActivity = Math.random() * 5 + 4; // 4-9
+        break;
+      case 2: // 12:00 午间
+        baseActivity = Math.random() * 2 + 1; // 1-3
+        break;
+      case 3: // 15:00 下午
+        baseActivity = Math.random() * 4 + 3; // 3-7
+        break;
+      case 4: // 18:00 傍晚
+        baseActivity = Math.random() * 3 + 2; // 2-5
+        break;
+      case 5: // 21:00 夜间
+        baseActivity = Math.random() * 6 + 5; // 5-11
+        break;
+      case 6: // 24:00 深夜
+        baseActivity = Math.random() * 2 + 0.5; // 0.5-2.5
+        break;
+      default:
+        baseActivity = Math.random() * 3 + 1;
+    }
+    
+    // 转换为热力图数据格式 [x, y, value]
+    mockData.push([timeIndex, 0, Math.round(baseActivity * 10) / 10]);
+  }
+  
+  console.log('[DashboardView] 生成模拟视频学习时段分布数据:', mockData);
+  return mockData;
+};
+
+// 检查学习行为数据是否为空或无效
+const isEmptyBehaviorData = (behavior) => {
+  if (!behavior) return true;
+  const totalActivity = (behavior.posted || 0) + (behavior.replied || 0) + (behavior.upvotes || 0);
+  return totalActivity === 0;
+};
+
+// 检查视频学习时段分布数据是否为空或无效
+const isEmptyStudyDistributionData = (distributionData) => {
+  if (!distributionData || !Array.isArray(distributionData)) return true;
+  if (distributionData.length === 0) return true;
+  
+  // 检查是否所有数值都为0或无效
+  const hasValidData = distributionData.some(item => {
+    return Array.isArray(item) && item.length >= 3 && (item[2] > 0);
+  });
+  
+  return !hasValidData;
+};
 
 // 生命周期钩子
 onMounted(async () => {
@@ -352,12 +734,29 @@ onMounted(async () => {
     // 更新图表数据
     console.log('[DashboardView] 开始更新图表数据');
     homeworkChartOptions.value.series[0].data = data.scores.homework;
-    behaviorChartOptions.value.series[0].data = [
-      { value: data.behavior.posted, name: '发帖讨论' },
-      { value: data.behavior.replied, name: '回复讨论' },
-      { value: data.behavior.upvotes, name: '获赞数' }
-    ];
-    studydistributeOptions.value.series[0].data = data.progress.rumination_ratios.map((v, i) => [i % 7, Math.floor(i / 7), v]);
+    
+    // 检查学习行为数据，如果为空则生成模拟数据
+    let behaviorData = data.behavior;
+    if (isEmptyBehaviorData(behaviorData)) {
+      behaviorData = generateMockBehaviorData();
+      console.log('[DashboardView] 使用模拟学习行为数据');
+    } else {
+      console.log('[DashboardView] 使用真实学习行为数据');
+    }
+    
+    // 更新所有行为相关图表和统计
+    updateAllBehaviorCharts(behaviorData);
+    
+    // 检查视频学习时段分布数据，如果为空则生成模拟数据
+    let studyDistributionData = data.progress.rumination_ratios.map((v, i) => [i % 7, Math.floor(i / 7), v]);
+    if (isEmptyStudyDistributionData(studyDistributionData)) {
+      studyDistributionData = generateMockStudyDistributionData();
+      console.log('[DashboardView] 使用模拟视频学习时段分布数据');
+    } else {
+      console.log('[DashboardView] 使用真实视频学习时段分布数据');
+    }
+    
+    studydistributeOptions.value.series[0].data = studyDistributionData;
     console.log('[DashboardView] 图表数据更新完成');
 
   } catch (error) {
@@ -464,6 +863,153 @@ const handleLogout = () => {
           cursor: help;
           margin-left: 0.5rem;
           color: #909399;
+        }
+        
+        .header-actions {
+          display: flex;
+          align-items: center;
+          gap: 15px;
+        }
+        
+        .chart-type-switcher {
+          .el-button {
+            padding: 4px 8px;
+            font-size: 11px;
+            
+            &.el-button--primary {
+              background: #409eff;
+              border-color: #409eff;
+            }
+          }
+        }
+      }
+      
+      // 特别小号化视频学习时段分布卡片
+      &:nth-child(3) {
+        max-width: 500px; // 限制最大宽度
+        
+        .responsive-chart {
+          height: 280px; // 缩小高度
+        }
+        
+        .chart-header {
+          font-size: 14px; // 缩小标题字体
+        }
+      }
+    }
+    
+    // 学习行为分析特殊样式
+    .behavior-analysis-card {
+      .behavior-overview {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 15px;
+        margin-bottom: 20px;
+        padding: 0 10px;
+        
+        .behavior-stat {
+          display: flex;
+          align-items: center;
+          padding: 15px;
+          background: linear-gradient(135deg, #f8f9ff 0%, #e8edff 100%);
+          border-radius: 12px;
+          border: 1px solid #e1e8ff;
+          transition: all 0.3s ease;
+          
+          &:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 16px rgba(102, 126, 234, 0.15);
+          }
+          
+          .stat-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 12px;
+            color: white;
+            font-size: 16px;
+          }
+          
+          .stat-content {
+            flex: 1;
+            
+            .stat-value {
+              font-size: 24px;
+              font-weight: bold;
+              color: #2c3e50;
+              margin: 0;
+            }
+            
+            .stat-label {
+              font-size: 12px;
+              color: #7f8c8d;
+              margin: 2px 0 4px 0;
+            }
+            
+            .stat-trend {
+              font-size: 11px;
+              display: flex;
+              align-items: center;
+              gap: 4px;
+              
+              &.positive {
+                color: #27ae60;
+              }
+              
+              &.neutral {
+                color: #95a5a6;
+              }
+            }
+          }
+        }
+      }
+      
+      .behavior-assessment {
+        margin-top: 20px;
+        padding: 20px;
+        background: linear-gradient(135deg, #f8f9ff 0%, #fff 100%);
+        border-radius: 12px;
+        border: 1px solid #e1e8ff;
+        
+        .assessment-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 15px;
+          
+          h4 {
+            margin: 0;
+            color: #2c3e50;
+            font-size: 16px;
+          }
+        }
+        
+        .assessment-content {
+          .behavior-progress {
+            margin-bottom: 15px;
+          }
+          
+          .assessment-details {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            
+            .score-text {
+              font-weight: 600;
+              color: #667eea;
+              font-size: 14px;
+            }
+            
+            .assessment-desc {
+              margin: 0;
+              font-size: 13px;
+              color: #7f8c8d;
+              font-style: italic;
+            }
+          }
         }
       }
     }

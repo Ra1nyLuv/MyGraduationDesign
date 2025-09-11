@@ -53,7 +53,6 @@ class LearningBehaviorClustering:
                     posted = discussion.posted_discussions or 0
                     replied = discussion.replied_discussions or 0
                     upvotes = discussion.upvotes_received or 0
-                    # 加权计算参与度
                     engagement_level = posted * 2 + replied * 1 + upvotes * 0.5
                 else:
                     engagement_level = 0
@@ -67,7 +66,7 @@ class LearningBehaviorClustering:
                     total_watch_time = sum(watch_times)
                     avg_rumination = np.mean([r for r in rumination_ratios if r > 0]) if any(r > 0 for r in rumination_ratios) else 0
                     
-                    # 投入度 = 观看时间 - 重复观看惩罚
+                    # 投入度 = 观看时间 - 重复观看
                     investment_degree = total_watch_time * (1 - min(avg_rumination * 0.5, 0.3))
                 else:
                     investment_degree = 0

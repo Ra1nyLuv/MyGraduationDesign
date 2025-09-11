@@ -32,7 +32,7 @@ print(f'环境变量加载状态: JWT_SECRET_KEY={os.getenv("JWT_SECRET_KEY")}, 
 app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY')
 jwt_manager = JWTManager(app)
 app.config['JSONIFY_PRETTYPRINT_REGULAR'] = False
-CORS(app, resources={r"/*": {"origins": "http://localhost:5173"}}, supports_credentials=True)
+CORS(app, resources={r"/*": {"origins": ["http://localhost:5173", "http://127.0.0.1:5173"]}}, supports_credentials=True)
 
 app.config['SQLALCHEMY_DATABASE_URI'] = (
     f"mysql+pymysql://{os.getenv('MYSQL_USER')}:{os.getenv('MYSQL_PASSWORD')}@"
@@ -47,10 +47,35 @@ app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY')
 print(f'JWT_SECRET_KEY加载状态: {os.getenv("JWT_SECRET_KEY")}')
 jwt_manager = JWTManager(app)
 
+# CORS辅助函数
+def _add_cors_headers(response, origin=None):
+    """为响应添加CORS头"""
+    allowed_origins = ['http://localhost:5173', 'http://127.0.0.1:5173']
+    
+    # 获取请求的Origin
+    if not origin:
+        origin = request.headers.get('Origin')
+    
+    # 如果Origin在允许列表中，使用该Origin，否则使用默认的localhost
+    if origin in allowed_origins:
+        response.headers.add('Access-Control-Allow-Origin', origin)
+    else:
+        _add_cors_headers(response)
+    
+    response.headers.add('Access-Control-Allow-Credentials', 'true')
+    response.headers.add('Vary', 'Origin')
+    return response
+
 # 预检响应头配置
 def _build_cors_preflight_response():
     response = jsonify({'msg': 'Preflight Request'})
-    response.headers.add('Access-Control-Allow-Origin', 'http://localhost:5173')
+    origin = request.headers.get('Origin')
+    # 允许的源地址列表
+    allowed_origins = ['http://localhost:5173', 'http://127.0.0.1:5173']
+    if origin in allowed_origins:
+        response.headers.add('Access-Control-Allow-Origin', origin)
+    else:
+        _add_cors_headers(response)
     response.headers.add('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With')
     response.headers.add('Access-Control-Allow-Methods', 'POST, GET, OPTIONS, PUT, DELETE')
     response.headers.add('Access-Control-Allow-Credentials', 'true')
@@ -312,14 +337,7 @@ def get_user_data():
         app.logger.error(f'数据查询失败: {str(e)}')
         return jsonify({'error': '获取数据失败', 'detail': str(e)}), 500
 
-# 预检请求响应构建函数
-def _build_cors_preflight_response():
-    response = jsonify({'msg': 'Preflight Request'})
-    response.headers.add('Access-Control-Allow-Origin', 'http://localhost:5173')
-    response.headers.add('Access-Control-Allow-Headers', 'Content-Type, Authorization')
-    response.headers.add('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-    response.headers.add('Access-Control-Allow-Credentials', 'true')
-    return response
+
 
 # 用户图表可视化数据接口
 @app.route('/api/chart-data', methods=['GET', 'OPTIONS'])
@@ -390,7 +408,7 @@ def get_admin_dashboard_stats():
         sort_order = request.args.get('sort_order', 'desc')
         print(f'[get_admin_dashboard_stats] 排序参数: sort_by={sort_by}, sort_order={sort_order}')
         
-        # 使用单个查询获取所有统计数据
+        # 使用单个查询获取所有统计数据（排除管理员用户）
         stats = db.session.query(
             db.func.count(User.id).label('user_count'),
             db.func.avg(SynthesisGrade.comprehensive_score).label('avg_comprehensive_score'),
@@ -405,14 +423,15 @@ def get_admin_dashboard_stats():
                     else_=0
                 )
             ).label('active_users')
-        ).join(SynthesisGrade, User.id == SynthesisGrade.id, isouter=True)\
+        ).filter(User.role != 'admin')\
+         .join(SynthesisGrade, User.id == SynthesisGrade.id, isouter=True)\
          .join(ExamStatistic, User.id == ExamStatistic.id, isouter=True)\
          .join(DiscussionParticipation, User.id == DiscussionParticipation.id, isouter=True)\
          .first()
         
         print(f'[get_admin_dashboard_stats] 数据库查询结果: {stats}')
         
-        # 获取所有学生数据
+        # 获取所有学生数据（排除管理员）
         query = db.session.query(
             User.id,
             User.name,
@@ -420,7 +439,8 @@ def get_admin_dashboard_stats():
             SynthesisGrade.comprehensive_score,
             ExamStatistic.score.label('exam_score'),
             DiscussionParticipation.total_discussions
-        ).join(SynthesisGrade, User.id == SynthesisGrade.id, isouter=True)\
+        ).filter(User.role != 'admin')\
+         .join(SynthesisGrade, User.id == SynthesisGrade.id, isouter=True)\
          .join(ExamStatistic, User.id == ExamStatistic.id, isouter=True)\
          .join(DiscussionParticipation, User.id == DiscussionParticipation.id, isouter=True)
         
@@ -443,7 +463,7 @@ def get_admin_dashboard_stats():
         
         students = query.all()
         
-        # 获取成绩分布
+        # 获取成绩分布（排除管理员）
         score_distribution = db.session.query(
             db.case(
                 (SynthesisGrade.comprehensive_score >= 90, '优秀'),
@@ -454,7 +474,9 @@ def get_admin_dashboard_stats():
                 else_='不及格'
             ).label('level'),
             db.func.count().label('count')
-        ).join(User, User.id == SynthesisGrade.id).group_by(db.case(
+        ).filter(User.role != 'admin')\
+         .join(User, User.id == SynthesisGrade.id)\
+         .group_by(db.case(
             (SynthesisGrade.comprehensive_score >= 90, '优秀'),
             (SynthesisGrade.comprehensive_score >= 80, '良好'),
             (SynthesisGrade.comprehensive_score >= 70, '中等'),
@@ -488,8 +510,7 @@ def get_admin_dashboard_stats():
         }
         
         response = jsonify(response_data)
-        response.headers.add('Access-Control-Allow-Origin', 'http://localhost:5173')
-        response.headers.add('Access-Control-Allow-Credentials', 'true')
+        _add_cors_headers(response)
         response.headers.add('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
         return response, 200
     except Exception as e:
@@ -497,15 +518,11 @@ def get_admin_dashboard_stats():
         app.logger.error(f"当前用户ID: {current_user_id}")
         app.logger.error(f"排序参数: sort_by={sort_by}, sort_order={sort_order}")
         response = jsonify({"status": 1, "msg": f"获取管理员数据失败: {str(e)}"})
-        response.headers.add('Access-Control-Allow-Origin', 'http://localhost:5173')
-        response.headers.add('Access-Control-Allow-Credentials', 'true')
+        _add_cors_headers(response)
         return response, 500
 
 
-if __name__ == '__main__':
-    app.run(debug=True)
 
-# 机器学习API接口
 @app.route('/api/ml/predict-grade', methods=['POST', 'OPTIONS'])
 @jwt_required(optional=True)
 def predict_grade():
@@ -524,7 +541,7 @@ def predict_grade():
         
         if not student_id:
             response = jsonify({'error': '缺少学生ID'})
-            response.headers.add('Access-Control-Allow-Origin', 'http://localhost:5173')
+            _add_cors_headers(response)
             return response, 400
         
         # 获取用户数据
@@ -538,12 +555,12 @@ def predict_grade():
         
         if not user:
             response = jsonify({'error': '用户不存在'})
-            response.headers.add('Access-Control-Allow-Origin', 'http://localhost:5173')
+            _add_cors_headers(response)
             return response, 404
         
         # 训练并预测
         predictor = GradePredictionModel()
-        all_users = User.query.options(
+        all_users = User.query.filter(User.role != 'admin').options(
             db.joinedload(User.synthesis_grades),
             db.joinedload(User.homework_statistic),
             db.joinedload(User.discussion_participation),
@@ -557,17 +574,17 @@ def predict_grade():
                     'success': True,
                     'prediction': prediction
                 })
-                response.headers.add('Access-Control-Allow-Origin', 'http://localhost:5173')
+                _add_cors_headers(response)
                 return response
         
         response = jsonify({'error': '预测失败'})
-        response.headers.add('Access-Control-Allow-Origin', 'http://localhost:5173')
+        _add_cors_headers(response)
         return response, 500
         
     except Exception as e:
         app.logger.error(f'成绩预测失败: {str(e)}')
         response = jsonify({'error': '服务暂时不可用'})
-        response.headers.add('Access-Control-Allow-Origin', 'http://localhost:5173')
+        _add_cors_headers(response)
         return response, 500
 
 @app.route('/api/ml/cluster-analysis', methods=['GET', 'OPTIONS'])
@@ -583,8 +600,8 @@ def cluster_analysis():
     try:
         from ml_services import LearningBehaviorClustering
         
-        # 获取所有用户数据
-        users = User.query.options(
+        # 获取所有用户数据（排除管理员）
+        users = User.query.filter(User.role != 'admin').options(
             db.joinedload(User.synthesis_grades),
             db.joinedload(User.homework_statistic),
             db.joinedload(User.discussion_participation),
@@ -593,7 +610,7 @@ def cluster_analysis():
         
         if len(users) < 3:
             response = jsonify({'error': f'数据量不足进行聚类分析，当前有{len(users)}个用户，至少需要3个'})
-            response.headers.add('Access-Control-Allow-Origin', 'http://localhost:5173')
+            _add_cors_headers(response)
             return response, 400
         
         clustering = LearningBehaviorClustering()
@@ -604,17 +621,17 @@ def cluster_analysis():
                     'success': True,
                     'analysis': analysis
                 })
-                response.headers.add('Access-Control-Allow-Origin', 'http://localhost:5173')
+                _add_cors_headers(response)
                 return response
         
         response = jsonify({'error': '聚类分析失败'})
-        response.headers.add('Access-Control-Allow-Origin', 'http://localhost:5173')
+        _add_cors_headers(response)
         return response, 500
         
     except Exception as e:
         app.logger.error(f'聚类分析失败: {str(e)}')
         response = jsonify({'error': '服务暂时不可用'})
-        response.headers.add('Access-Control-Allow-Origin', 'http://localhost:5173')
+        _add_cors_headers(response)
         return response, 500
 
 @app.route('/api/ml/recommendations', methods=['POST', 'OPTIONS'])
@@ -635,7 +652,7 @@ def get_recommendations():
         
         if not student_id:
             response = jsonify({'error': '缺少学生ID'})
-            response.headers.add('Access-Control-Allow-Origin', 'http://localhost:5173')
+            _add_cors_headers(response)
             return response, 400
         
         user = User.query.options(
@@ -647,7 +664,7 @@ def get_recommendations():
         
         if not user:
             response = jsonify({'error': '用户不存在'})
-            response.headers.add('Access-Control-Allow-Origin', 'http://localhost:5173')
+            _add_cors_headers(response)
             return response, 404
         
         recommender = PersonalizedRecommendation()
@@ -658,17 +675,17 @@ def get_recommendations():
                 'success': True,
                 'recommendations': recommendations
             })
-            response.headers.add('Access-Control-Allow-Origin', 'http://localhost:5173')
+            _add_cors_headers(response)
             return response
         
         response = jsonify({'error': '推荐生成失败'})
-        response.headers.add('Access-Control-Allow-Origin', 'http://localhost:5173')
+        _add_cors_headers(response)
         return response, 500
         
     except Exception as e:
         app.logger.error(f'推荐生成失败: {str(e)}')
         response = jsonify({'error': '服务暂时不可用'})
-        response.headers.add('Access-Control-Allow-Origin', 'http://localhost:5173')
+        _add_cors_headers(response)
         return response, 500
 
 @app.route('/api/ml/anomaly-detection', methods=['GET', 'OPTIONS'])
@@ -684,7 +701,7 @@ def anomaly_detection():
     try:
         from ml_services import AnomalyDetector
         
-        users = User.query.options(
+        users = User.query.filter(User.role != 'admin').options(
             db.joinedload(User.synthesis_grades),
             db.joinedload(User.homework_statistic),
             db.joinedload(User.discussion_participation),
@@ -693,7 +710,7 @@ def anomaly_detection():
         
         if len(users) < 3:
             response = jsonify({'error': f'数据量不足进行异常检测，当前有{len(users)}个用户，至少需要3个'})
-            response.headers.add('Access-Control-Allow-Origin', 'http://localhost:5173')
+            _add_cors_headers(response)
             return response, 400
         
         detector = AnomalyDetector()
@@ -704,17 +721,17 @@ def anomaly_detection():
                     'success': True,
                     'results': results
                 })
-                response.headers.add('Access-Control-Allow-Origin', 'http://localhost:5173')
+                _add_cors_headers(response)
                 return response
         
         response = jsonify({'error': '异常检测失败'})
-        response.headers.add('Access-Control-Allow-Origin', 'http://localhost:5173')
+        _add_cors_headers(response)
         return response, 500
         
     except Exception as e:
         app.logger.error(f'异常检测失败: {str(e)}')
         response = jsonify({'error': '服务暂时不可用'})
-        response.headers.add('Access-Control-Allow-Origin', 'http://localhost:5173')
+        _add_cors_headers(response)
         return response, 500
 
 @app.route('/api/ml/train-models', methods=['POST', 'OPTIONS'])
@@ -735,7 +752,7 @@ def train_ml_models():
         if current_user_id and not current_user_id.startswith('admin'):
             app.logger.warning(f'非管理员用户尝试训练模型: {current_user_id}')
             response = jsonify({'error': '无权限执行此操作'})
-            response.headers.add('Access-Control-Allow-Origin', 'http://localhost:5173')
+            _add_cors_headers(response)
             return response, 403
         
         app.logger.info('开始导入ML模块...')
@@ -745,11 +762,11 @@ def train_ml_models():
         except ImportError as e:
             app.logger.error(f'ML模块导入失败: {str(e)}')
             response = jsonify({'error': f'ML模块导入失败: {str(e)}'})
-            response.headers.add('Access-Control-Allow-Origin', 'http://localhost:5173')
+            _add_cors_headers(response)
             return response, 500
         
         app.logger.info('开始查询用户数据...')
-        users = User.query.options(
+        users = User.query.filter(User.role != 'admin').options(
             db.joinedload(User.synthesis_grades),
             db.joinedload(User.homework_statistic),
             db.joinedload(User.discussion_participation),
@@ -761,7 +778,7 @@ def train_ml_models():
         if len(users) < 3:
             app.logger.warning(f'用户数量不足: {len(users)} < 3')
             response = jsonify({'error': f'数据量不足进行模型训练，当前有{len(users)}个用户，至少需要3个'})
-            response.headers.add('Access-Control-Allow-Origin', 'http://localhost:5173')
+            _add_cors_headers(response)
             return response, 400
         
         results = {
@@ -815,7 +832,7 @@ def train_ml_models():
                 'details': errors,
                 'results': results
             })
-            response.headers.add('Access-Control-Allow-Origin', 'http://localhost:5173')
+            _add_cors_headers(response)
             return response, 500
         
         app.logger.info(f'模型训练完成: {success_count}/3 个模型成功')
@@ -825,7 +842,7 @@ def train_ml_models():
             'message': f'模型训练完成，成功训练 {success_count}/3 个模型',
             'errors': errors if errors else None
         })
-        response.headers.add('Access-Control-Allow-Origin', 'http://localhost:5173')
+        _add_cors_headers(response)
         return response
         
     except Exception as e:
@@ -834,7 +851,7 @@ def train_ml_models():
             'error': '模型训练过程异常',
             'detail': str(e)
         })
-        response.headers.add('Access-Control-Allow-Origin', 'http://localhost:5173')
+        _add_cors_headers(response)
         return response, 500
 
 # 数据导入API接口
@@ -852,19 +869,19 @@ def import_data():
         current_user_id = get_jwt_identity()
         if current_user_id and not current_user_id.startswith('admin'):
             response = jsonify({'error': '无权限执行此操作'})
-            response.headers.add('Access-Control-Allow-Origin', 'http://localhost:5173')
+            _add_cors_headers(response)
             return response, 403
             
         # 检查文件是否存在
         if 'file' not in request.files:
             response = jsonify({'error': '未上传文件'})
-            response.headers.add('Access-Control-Allow-Origin', 'http://localhost:5173')
+            _add_cors_headers(response)
             return response, 400
             
         file = request.files['file']
         if file.filename == '':
             response = jsonify({'error': '未选择文件'})
-            response.headers.add('Access-Control-Allow-Origin', 'http://localhost:5173')
+            _add_cors_headers(response)
             return response, 400
             
         # 保存临时文件
@@ -910,11 +927,14 @@ def import_data():
             'message': '文件处理完成',
             'results': results
         })
-        response.headers.add('Access-Control-Allow-Origin', 'http://localhost:5173')
+        _add_cors_headers(response)
         return response
         
     except Exception as e:
         app.logger.error(f'数据导入异常: {str(e)}', exc_info=True)
         response = jsonify({'error': '数据处理失败', 'detail': str(e)})
-        response.headers.add('Access-Control-Allow-Origin', 'http://localhost:5173')
+        _add_cors_headers(response)
         return response, 500
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000, debug=False)

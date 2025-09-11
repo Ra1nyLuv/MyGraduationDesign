@@ -20,7 +20,7 @@ class AnomalyDetector:
         """
         self.contamination = contamination
         self.model = IsolationForest(contamination=contamination, random_state=42, n_estimators=50)
-        self.scaler = RobustScaler()  # 更鲁棒的缩放器
+        self.scaler = RobustScaler()
         self.is_trained = False
         self.data_size = 'unknown'
         self.feature_names = [
