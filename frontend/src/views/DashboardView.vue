@@ -819,6 +819,7 @@ const handleLogout = () => {
       .stat-title {
         color: #606266;
         margin-bottom: 0.5rem;
+        font-size: 16px;
       }
 
       .stat-value {
@@ -858,6 +859,9 @@ const handleLogout = () => {
         display: flex;
         justify-content: space-between;
         align-items: center;
+        font-size: 16px;
+        border-bottom: 1px solid #ebeef5;
+        
 
         .chart-tooltip {
           cursor: help;
@@ -869,6 +873,7 @@ const handleLogout = () => {
           display: flex;
           align-items: center;
           gap: 15px;
+          border-radius: 22px;
         }
         
         .chart-type-switcher {
@@ -884,16 +889,16 @@ const handleLogout = () => {
         }
       }
       
-      // 特别小号化视频学习时段分布卡片
+      // 视频学习时段分布卡片
       &:nth-child(3) {
-        max-width: 500px; // 限制最大宽度
+        max-width: 500px;
         
         .responsive-chart {
-          height: 280px; // 缩小高度
+          height: 280px;
         }
         
         .chart-header {
-          font-size: 14px; // 缩小标题字体
+          font-size: 16px;
         }
       }
     }
@@ -902,9 +907,9 @@ const handleLogout = () => {
     .behavior-analysis-card {
       .behavior-overview {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        grid-template-columns: repeat(3, minmax(90px, 1fr));
         gap: 15px;
-        margin-bottom: 20px;
+        margin-bottom: 10px;
         padding: 0 10px;
         
         .behavior-stat {
@@ -922,8 +927,8 @@ const handleLogout = () => {
           }
           
           .stat-icon {
-            width: 40px;
-            height: 40px;
+            width: 20px;
+            height: 20px;
             border-radius: 50%;
             display: flex;
             align-items: center;
@@ -1071,7 +1076,8 @@ const handleLogout = () => {
 #footer {
   padding: 0 0 30px 0;
   color: #677184;
-  font-size: 14px;
+  font-size: 12px;
+  font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
   text-align: center;
   background: white;
   bottom: 0ch;

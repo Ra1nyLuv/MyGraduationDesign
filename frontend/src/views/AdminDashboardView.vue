@@ -278,16 +278,16 @@
             @input="updateFilteredStudents" @clear="handleSearchClear" />
         </div>
         <el-table :data="filteredStudentList" border style="width: 100%" @sort-change="handleSortChange"
-          :default-sort="{ prop: 'name', order: 'ascending' }">
-          <el-table-column prop="id" label="学号" width="180" />
+          :default-sort="{ prop: 'comprehensive_score', order: 'descending' }">
+          <el-table-column prop="id" label="学号" width="180" sortable />
           <el-table-column prop="name" label="姓名" width="180" />
           <el-table-column prop="phone_number" label="电话号码" width="180">
             <template #default="{ row }">
               {{ row.phone_number || '未填写' }}
             </template>
           </el-table-column>
-          <el-table-column prop="comprehensive_score" label="综合成绩" />
-          <el-table-column prop="exam_score" label="考试成绩" />
+          <el-table-column prop="comprehensive_score" label="综合成绩" sortable />
+          <el-table-column prop="exam_score" label="考试成绩" sortable />
           <el-table-column label="状态" width="180">
             <template #default="{ row }">
               <el-button type="primary" size="small" @click="handleView(row)">查看</el-button>
@@ -333,8 +333,8 @@ const searchQuery = ref('');
 const currentPage = ref(1);
 const pageSize = ref(10);
 const totalStudents = ref(0);
-const sortProp = ref('name');
-const sortOrder = ref('ascending');
+const sortProp = ref('comprehensive_score');
+const sortOrder = ref('descending');
 
 // 机器学习管理功能
 const mlManagement = ref({
@@ -362,8 +362,9 @@ const handleView = (row) => {
 };
 
 const handleSortChange = ({ prop, order }) => {
+  console.log('[AdminDashboard] 排序变更:', { prop, order });
   sortProp.value = prop;
-  sortOrder.value = order;
+  sortOrder.value = order || 'ascending'; // 如果order为null，设置默认值
   updateFilteredStudents();
 };
 
@@ -390,19 +391,44 @@ const updateFilteredStudents = () => {
   }
   
   // 排序功能
-  filtered.sort((a, b) => {
-    if (sortOrder.value === 'ascending') {
-      return a[sortProp.value] > b[sortProp.value] ? 1 : -1;
-    } else {
-      return a[sortProp.value] < b[sortProp.value] ? 1 : -1;
-    }
-  });
+  if (sortProp.value && sortOrder.value) {
+    filtered.sort((a, b) => {
+      let aValue = a[sortProp.value];
+      let bValue = b[sortProp.value];
+      
+      // 处理null或undefined值
+      if (aValue === null || aValue === undefined) aValue = sortOrder.value === 'ascending' ? Number.MAX_VALUE : Number.MIN_VALUE;
+      if (bValue === null || bValue === undefined) bValue = sortOrder.value === 'ascending' ? Number.MAX_VALUE : Number.MIN_VALUE;
+      
+      // 处理数字类型
+      if (typeof aValue === 'number' && typeof bValue === 'number') {
+        return sortOrder.value === 'ascending' ? aValue - bValue : bValue - aValue;
+      }
+      
+      // 处理字符串类型
+      if (typeof aValue === 'string' && typeof bValue === 'string') {
+        return sortOrder.value === 'ascending' ? aValue.localeCompare(bValue) : bValue.localeCompare(aValue);
+      }
+      
+      // 其他情况转换为字符串比较
+      aValue = String(aValue);
+      bValue = String(bValue);
+      return sortOrder.value === 'ascending' ? aValue.localeCompare(bValue) : bValue.localeCompare(aValue);
+    });
+  }
   
   // 分页功能
   totalStudents.value = filtered.length;
   const start = (currentPage.value - 1) * pageSize.value;
   const end = start + pageSize.value;
   filteredStudentList.value = filtered.slice(start, end);
+  
+  console.log('[AdminDashboard] 学生列表更新完成:', {
+    total: filtered.length,
+    displayed: filteredStudentList.value.length,
+    sortProp: sortProp.value,
+    sortOrder: sortOrder.value
+  });
 };
 
 // ML管理功能方法
@@ -804,7 +830,8 @@ studentList.value = res.data.data.students;
 #footer {
   padding: 0 0 30px 0;
   color: #677184;
-  font-size: 14px;
+  font-size: 12px;
+  font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
   text-align: center;
   background: #f5f7fa;
   bottom: 0ch;
