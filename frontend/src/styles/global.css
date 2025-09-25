@@ -1,11 +1,6 @@
 /* 全局样式兼容性修复 */
 @charset "UTF-8";
 
-/* 标准化属性声明 */
-html {
-  lang: "zh-CN";
-}
-
 /* 修正Element Plus组件样式 */
 .el-pagination .el-input__inner {
   -webkit-appearance: textfield;

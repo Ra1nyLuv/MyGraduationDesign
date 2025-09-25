@@ -1,28 +1,74 @@
 <template>
   <div class="auth-container">
-    <el-card class="auth-card">
-      <h2>用户注册</h2>
-      <el-form :model="form" :rules="rules" ref="registerForm" label-width="80px" @keyup.enter.native="handleRegister">
-        <el-form-item label="账号" prop="id">
-          <el-input v-model="form.id" placeholder="请输入账号ID"></el-input>
-        </el-form-item>
-        <el-form-item label="姓名" prop="name">
-          <el-input v-model="form.name" placeholder="请输入真实姓名"></el-input>
-        </el-form-item>
-        <el-form-item label="手机号" prop="phone_number">
-          <el-input v-model="form.phone_number" placeholder="请输入11位手机号"></el-input>
-        </el-form-item>
-        <el-form-item label="密码" prop="password">
-          <el-input type="password" v-model="form.password" placeholder="请输入密码"></el-input>
-        </el-form-item>
-        <el-form-item>
-          <el-button type="primary" @click="handleRegister" :loading="loading">注册</el-button>
-        </el-form-item>
-      </el-form>
-      <p class="login-link">
-        已有账号？<el-link type="primary" @click="goToLogin">立即登录</el-link>
-      </p>
-    </el-card>
+    <div class="auth-wrapper">
+      <el-card class="auth-card">
+        <div class="card-header">
+          <h2>用户注册</h2>
+          <p class="subtitle">创建新账户以开始使用系统</p>
+        </div>
+        <el-form :model="form" :rules="rules" ref="registerForm" label-width="0px" @keyup.enter.native="handleRegister">
+          <el-form-item prop="id">
+            <el-input 
+              v-model="form.id" 
+              placeholder="请输入账号ID"
+              prefix-icon="User"
+              size="large"
+              class="auth-input"
+            >
+            </el-input>
+          </el-form-item>
+          <el-form-item prop="name">
+            <el-input 
+              v-model="form.name" 
+              placeholder="请输入真实姓名"
+              prefix-icon="UserFilled"
+              size="large"
+              class="auth-input"
+            >
+            </el-input>
+          </el-form-item>
+          <el-form-item prop="phone_number">
+            <el-input 
+              v-model="form.phone_number" 
+              placeholder="请输入11位手机号"
+              prefix-icon="Phone"
+              size="large"
+              class="auth-input"
+            >
+            </el-input>
+          </el-form-item>
+          <el-form-item prop="password">
+            <el-input 
+              type="password" 
+              v-model="form.password" 
+              placeholder="请输入密码"
+              prefix-icon="Lock"
+              show-password
+              size="large"
+              class="auth-input"
+            >
+            </el-input>
+          </el-form-item>
+          <el-form-item>
+            <el-button 
+              type="primary" 
+              @click="handleRegister" 
+              :loading="loading"
+              size="large"
+              class="auth-button"
+              round
+            >
+              注册
+            </el-button>
+          </el-form-item>
+        </el-form>
+        <div class="auth-footer">
+          <p class="login-link">
+            已有账号？<el-link type="primary" @click="goToLogin">立即登录</el-link>
+          </p>
+        </div>
+      </el-card>
+    </div>
   </div>
   <footer id="footer">
     <div class="container">
@@ -85,38 +131,97 @@ const goToLogin = () => {
   justify-content: center;
   align-items: center;
   min-height: 100vh;
-  background: white;
+  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  padding: 20px;
+}
+
+.auth-wrapper {
+  width: 100%;
+  max-width: 450px;
 }
 
 .auth-card {
-  width: 420px;
-  padding: 2rem;
+  border-radius: 12px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+  border: none;
+  padding: 2.5rem 2rem;
+}
+
+.card-header {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.card-header h2 {
+  font-size: 1.8rem;
+  color: #303133;
+  margin-bottom: 0.5rem;
+  font-weight: 600;
+}
+
+.subtitle {
+  color: #909399;
+  font-size: 0.95rem;
+  margin: 0;
+}
+
+.auth-input {
+  margin-bottom: 1.2rem;
+}
+
+:deep(.el-input__wrapper) {
   border-radius: 8px;
-  box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+  padding: 2px 12px;
 }
 
-.el-form-item {
-  margin-bottom: 1.5rem;
+:deep(.el-input__prefix) {
+  font-size: 16px;
+  color: #909399;
 }
 
-.el-button {
+.auth-button {
   width: 100%;
-  margin-top: 0.5rem;
+  margin-top: 1rem;
+  background: linear-gradient(135deg, #409eff 0%, #1a73e8 100%);
+  border: none;
+  font-size: 1rem;
+  font-weight: 500;
+  letter-spacing: 1px;
+  padding: 18px;
+}
+
+.auth-button:hover {
+  background: linear-gradient(135deg, #1a73e8 0%, #409eff 100%);
+  box-shadow: 0 4px 12px rgba(64, 158, 255, 0.3);
+}
+
+.auth-footer {
+  text-align: center;
+  margin-top: 1.5rem;
 }
 
 .login-link {
-  margin-top: 1.5rem;
-  font-size: 0.875rem;
+  font-size: 0.9rem;
   color: #606266;
+  margin: 0;
 }
 
 #footer {
-  padding: 0 0 30px 0;
+  padding: 20px 0 30px 0;
   color: #677184;
   font-size: 14px;
   text-align: center;
-  background: white;
-  bottom: 0ch;
-  opacity: 0.8;
+  background: transparent;
+  position: relative;
+}
+
+@media (max-width: 480px) {
+  .auth-card {
+    padding: 1.5rem 1rem;
+  }
+  
+  .card-header h2 {
+    font-size: 1.5rem;
+  }
 }
 </style>
