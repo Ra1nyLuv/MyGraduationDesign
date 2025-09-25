@@ -165,6 +165,21 @@ cd frontend && npm install
 cd ../backend && pip install -r requirements.txt
 ```
 
+### ▶️ 一键启停系统
+
+项目提供了一键启停脚本，可以方便地启动和停止整个系统：
+
+```bash
+# 启动整个系统（后端+前端）
+python system-start.py
+```
+
+脚本会自动启动：
+- 后端服务：http://localhost:5000
+- 前端服务：http://localhost:5173
+
+使用 `Ctrl+C` 可以优雅地停止所有服务。
+
 ### 🔧 环境配置
 
 #### 1. 环境变量设置
